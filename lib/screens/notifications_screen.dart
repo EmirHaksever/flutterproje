@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/app_notification.dart';
 import '../repositories/notifications_repository.dart';
+import '../theme/app_theme.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -31,13 +32,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _items = list;
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bildirimler yüklenemedi.')),
-      );
+      _snack('Bildirimler yüklenemedi.');
     }
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _markAllRead() async {
@@ -48,90 +53,199 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _tap(AppNotification n) async {
-    if (!n.isRead) {
-      try {
-        await _repo.markRead(n.id);
-        setState(() {
-          final i = _items.indexWhere((e) => e.id == n.id);
-          if (i != -1) {
-            _items[i] = AppNotification(
+    if (n.isRead) return;
+    try {
+      await _repo.markRead(n.id);
+      final i = _items.indexWhere((e) => e.id == n.id);
+      if (i != -1 && mounted) {
+        setState(() => _items[i] = AppNotification(
               id: n.id,
               userId: n.userId,
               message: n.message,
               isRead: true,
               createdAt: n.createdAt,
-            );
-          }
-        });
-      } catch (_) {}
+            ));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _delete(AppNotification n) async {
+    final i = _items.indexWhere((e) => e.id == n.id);
+    setState(() => _items.removeWhere((e) => e.id == n.id));
+    try {
+      await _repo.delete(n.id);
+    } catch (_) {
+      if (i != -1 && mounted) setState(() => _items.insert(i, n));
     }
+  }
+
+  // --- yardımcılar -----------------------------------------------------
+
+  String _dayKey(DateTime d) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final that = DateTime(d.year, d.month, d.day);
+    final diff = today.difference(that).inDays;
+    if (diff <= 0) return 'Bugün';
+    if (diff == 1) return 'Dün';
+    return 'Daha Önce';
+  }
+
+  String _timeLabel(DateTime d) {
+    final key = _dayKey(d);
+    if (key == 'Daha Önce') return DateFormat('dd MMM', 'tr_TR').format(d);
+    return DateFormat('HH:mm').format(d);
+  }
+
+  IconData _iconFor(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('arkadaşlık')) return Icons.person_add_alt_1_outlined;
+    if (m.contains('paylaş')) return Icons.ios_share_outlined;
+    if (m.contains('tamamla')) return Icons.check_circle_outline;
+    if (m.contains('ekle') || m.contains('güncelle') || m.contains('sil')) {
+      return Icons.shopping_basket_outlined;
+    }
+    return Icons.notifications_none_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final primary = scheme.primary;
     final hasUnread = _items.any((n) => !n.isRead);
+
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Bildirimler'),
-        backgroundColor: primary,
-        foregroundColor: Colors.white,
         actions: [
           if (hasUnread)
-            TextButton(
+            IconButton(
+              tooltip: 'Tümünü okundu yap',
+              icon: const Icon(Icons.done_all),
               onPressed: _markAllRead,
-              child: const Text('Tümünü okundu yap',
-                  style: TextStyle(color: Colors.white)),
             ),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.notifications_none,
-                          size: 64, color: scheme.onSurfaceVariant),
-                      const SizedBox(height: 12),
-                      Text('Bildirim yok.',
-                          style: TextStyle(
-                              color: scheme.onSurfaceVariant, fontSize: 16)),
-                    ],
-                  ),
-                )
+              ? _empty(scheme)
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView.separated(
-                    itemCount: _items.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, i) {
-                      final n = _items[i];
-                      return ListTile(
-                        leading: Icon(
-                          n.isRead
-                              ? Icons.notifications_none
-                              : Icons.notifications_active,
-                          color: n.isRead ? Colors.grey : primary,
-                        ),
-                        title: Text(
-                          n.message,
-                          style: TextStyle(
-                              fontWeight: n.isRead
-                                  ? FontWeight.normal
-                                  : FontWeight.w600),
-                        ),
-                        subtitle: Text(DateFormat('dd MMM yyyy, HH:mm', 'tr_TR')
-                            .format(n.createdAt)),
-                        tileColor:
-                            n.isRead ? null : primary.withValues(alpha: 0.06),
-                        onTap: () => _tap(n),
-                      );
-                    },
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+                    children: _buildGrouped(scheme),
                   ),
                 ),
+    );
+  }
+
+  List<Widget> _buildGrouped(ColorScheme scheme) {
+    final widgets = <Widget>[];
+    String? lastKey;
+    for (final n in _items) {
+      final key = _dayKey(n.createdAt);
+      if (key != lastKey) {
+        widgets.add(Padding(
+          padding: EdgeInsets.only(top: lastKey == null ? 0 : 14, bottom: 8),
+          child: Text(key,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.onSurface)),
+        ));
+        lastKey = key;
+      }
+      widgets.add(_item(scheme, n));
+    }
+    return widgets;
+  }
+
+  Widget _item(ColorScheme scheme, AppNotification n) {
+    final card = Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: n.isRead ? scheme.surface : AppTheme.heroGreenBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: scheme.surface,
+            child: Icon(_iconFor(n.message), size: 18, color: scheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              n.message,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.35,
+                fontWeight: n.isRead ? FontWeight.w500 : FontWeight.w600,
+                color: scheme.onSurface,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(_timeLabel(n.createdAt),
+                  style: TextStyle(
+                      fontSize: 10, color: scheme.onSurfaceVariant)),
+              if (!n.isRead) ...[
+                const SizedBox(height: 6),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                      color: scheme.primary, shape: BoxShape.circle),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+
+    return Dismissible(
+      key: ValueKey(n.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 22),
+        decoration: BoxDecoration(
+          color: scheme.error.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Icon(Icons.delete_outline, color: scheme.error),
+      ),
+      onDismissed: (_) => _delete(n),
+      child: InkWell(
+        onTap: () => _tap(n),
+        borderRadius: BorderRadius.circular(16),
+        child: card,
+      ),
+    );
+  }
+
+  Widget _empty(ColorScheme scheme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notifications_none_rounded,
+              size: 60, color: scheme.onSurfaceVariant),
+          const SizedBox(height: 12),
+          Text('Henüz bildirim yok.',
+              style: TextStyle(color: scheme.onSurfaceVariant)),
+        ],
+      ),
     );
   }
 }
