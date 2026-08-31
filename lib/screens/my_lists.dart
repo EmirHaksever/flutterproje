@@ -5,8 +5,6 @@ import 'dart:async'; // StreamSubscription için
 
 import 'list_detail.dart';
 import 'create_list.dart';
-import 'ai_chat.dart';
-import 'stats.dart'; // İstatistikler sayfası için import
 import '../constants/categories.dart';
 
 class MyListsPage extends StatefulWidget {
@@ -23,7 +21,6 @@ class _MyListsPageState extends State<MyListsPage> {
   List<Map<String, dynamic>> _lists = [];
   bool _isLoadingLists = true;
   bool _isDeleting = false;
-  int _currentIndex = 1; // Bu sayfa ortada
   String? _userId;
 
   List<Map<String, dynamic>> _allAvailableCategories = [];
@@ -421,34 +418,16 @@ class _MyListsPageState extends State<MyListsPage> {
     }
   }
 
-  void _onTabTapped(int index) {
-    if (index == _currentIndex) return;
-
-    setState(() => _currentIndex = index);
-
-    final MaterialColor safePrimarySwatch = widget.customPrimarySwatch;
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CreateListPage(
-            availableCategories: _allAvailableCategories,
-            customPrimarySwatch: safePrimarySwatch,
-          ),
+  void _openCreateList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateListPage(
+          availableCategories: _allAvailableCategories,
+          customPrimarySwatch: widget.customPrimarySwatch,
         ),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AIChatPage()),
-      );
-    } else if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => StatsPage(customPrimarySwatch: safePrimarySwatch)),
-      );
-    }
+      ),
+    );
   }
 
   // Helper function to get a consistent color for each list based on its ID
@@ -499,9 +478,7 @@ class _MyListsPageState extends State<MyListsPage> {
                               ),
                               const SizedBox(height: 30),
                               ElevatedButton.icon(
-                                onPressed: () {
-                                  _onTabTapped(0);
-                                },
+                                onPressed: _openCreateList,
                                 icon: const Icon(Icons.add_circle_outline),
                                 label: const Text('Yeni Liste Oluştur'),
                                 style: ElevatedButton.styleFrom(
@@ -655,55 +632,12 @@ class _MyListsPageState extends State<MyListsPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _onTabTapped(0),
+        onPressed: _openCreateList,
         icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
         label: const Text('Yeni Liste Oluştur', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: globalPrimaryColor.shade700,
         elevation: 8,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
-        color: Colors.white,
-        elevation: 10,
-        child: Row(
-        ),
-      ),
-    );
-  }
-
-  // Alt gezinme çubuğu öğesi için yardımcı widget
-  Widget _buildNavItem(IconData icon, String label, int index, MaterialColor primaryColor) {
-    final bool isSelected = _currentIndex == index;
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _onTabTapped(index),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  color: isSelected ? primaryColor.shade700 : Colors.grey.shade600,
-                  size: 26,
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? primaryColor.shade700 : Colors.grey.shade600,
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

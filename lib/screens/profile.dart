@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // SharedPreferences için ekle
-import 'package:flutter/services.dart'; // Clipboard için ekle
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -14,7 +13,6 @@ class _ProfilePageState extends State<ProfilePage> {
   final supabase = Supabase.instance.client;
   User? _currentUser;
   String? _userEmail;
-  String? _currentUserId; // Kullanıcı ID'si için değişken
   bool _isLoading = false;
 
   @override
@@ -31,7 +29,6 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       _currentUser = supabase.auth.currentUser;
       _userEmail = _currentUser?.email;
-      _currentUserId = _currentUser?.id; // Kullanıcı ID'sini al
 
       // Opsiyonel: Eğer public.users tablonuzda ek profil bilgileri varsa buradan çekebilirsiniz
       // final response = await supabase
@@ -139,46 +136,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: Colors.grey.shade800,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  // Kullanıcı ID'si (Yeni)
-                  if (_currentUserId != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Kullanıcı ID: $_currentUserId',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade700,
-                                ),
-                                // overflow: TextOverflow.ellipsis, // Taşmayı engelle - KALDITILDI
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: Icon(Icons.copy, size: 18, color: primaryColor),
-                              tooltip: 'ID\'yi Kopyala',
-                              onPressed: () {
-                                // ID kopyalama işlevi için
-                                Clipboard.setData(ClipboardData(text: _currentUserId!)); // ID'yi panoya kopyala
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Kullanıcı ID\'si kopyalandı!')),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   const SizedBox(height: 30),
 
                   // Profil Seçenekleri Kartları

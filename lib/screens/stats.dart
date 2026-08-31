@@ -59,7 +59,7 @@ class _StatsPageState extends State<StatsPage> {
           .select('id, created_at')
           .eq('user_id', userId)
           .count(CountOption.exact);
-      _totalLists = listsResponse.count ?? 0;
+      _totalLists = listsResponse.count;
 
       // 2. Tüm ürünleri çek (tamamlanan ve tamamlanmayan)
       final itemsResponse = await supabase

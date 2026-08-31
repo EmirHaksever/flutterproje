@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart'; // Tarih formatlama için eklendi, gerekebilir
 
 class CategoryDetailPage extends StatefulWidget {
   final String categoryName;
