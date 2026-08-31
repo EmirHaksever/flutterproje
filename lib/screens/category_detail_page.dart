@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../widgets/ui_kit.dart';
+import 'create_list.dart';
+
 class CategoryDetailPage extends StatefulWidget {
   final String categoryName;
   final MaterialColor customPrimarySwatch;
@@ -17,190 +20,200 @@ class CategoryDetailPage extends StatefulWidget {
 
 class _CategoryDetailPageState extends State<CategoryDetailPage> {
   final supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> _categoryItems = [];
-  int _totalCategoryItems = 0;
-  int _completedCategoryItems = 0;
+  List<Map<String, dynamic>> _items = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchCategoryDetails();
+    _fetch();
   }
 
-  Future<void> _fetchCategoryDetails() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _fetch() async {
+    setState(() => _isLoading = true);
     try {
-      // Supabase sorgusu güncellendi:
-      // 'list_items' tablosundan ürünleri çekerken, 'shopping_lists' tablosu ile
-      // join yaparak (name) alanını da getiriyoruz.
       final response = await supabase
           .from('list_items')
-          .select('*, shopping_lists(name)') // Burası güncellendi!
-          .eq('category', widget.categoryName); // Sadece bu kategoriye ait olanları filtrele
-
+          .select('*')
+          .eq('category', widget.categoryName);
       if (mounted) {
-        int total = 0;
-        int completed = 0;
-        final List<Map<String, dynamic>> items = [];
-
-        for (var item in response) {
-          items.add(Map<String, dynamic>.from(item));
-          total++;
-          if (item['is_completed'] == true) {
-            completed++;
-          }
-        }
-
         setState(() {
-          _categoryItems = items;
-          _totalCategoryItems = total;
-          _completedCategoryItems = completed;
+          _items = List<Map<String, dynamic>>.from(response as List);
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Kategori detayları çekilirken hata oluştu: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kategori detayları yüklenirken bir hata oluştu: $e')),
-        );
-      }
+      debugPrint('Kategori detayları çekilemedi: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Ürünün tamamlanma durumunu güncelleyen fonksiyon
-  Future<void> _toggleItemCompletion(String itemId, bool currentStatus) async {
-    try {
-      await supabase
-          .from('list_items')
-          .update({'is_completed': !currentStatus})
-          .eq('id', itemId);
-      
-      // Başarılı olursa listeyi yeniden çek
-      _fetchCategoryDetails();
-    } catch (e) {
-      debugPrint('Ürün tamamlama durumu güncellenirken hata oluştu: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Durum güncellenirken hata oluştu: $e')),
-        );
-      }
+  int get _completed =>
+      _items.where((i) => i['is_completed'] == true).length;
+
+  int get _thisMonth {
+    final now = DateTime.now();
+    return _items.where((i) {
+      final d = DateTime.tryParse(i['created_at']?.toString() ?? '');
+      return d != null && d.year == now.year && d.month == now.month;
+    }).length;
+  }
+
+  String get _lastPurchase {
+    DateTime? latest;
+    for (final i in _items) {
+      final d = DateTime.tryParse(i['created_at']?.toString() ?? '');
+      if (d != null && (latest == null || d.isAfter(latest))) latest = d;
     }
+    if (latest == null) return '—';
+    final diff = DateTime.now().difference(latest).inDays;
+    if (diff <= 0) return 'bugün';
+    if (diff == 1) return 'dün';
+    return '$diff gün önce';
+  }
+
+  /// Ürün adına göre {count, imageUrl} — en çok alınanlar.
+  List<({String name, int count, String? image})> get _topProducts {
+    final map = <String, ({int count, String? image})>{};
+    for (final i in _items) {
+      final name = (i['product_name'] ?? '') as String;
+      if (name.isEmpty) continue;
+      final prev = map[name];
+      map[name] = (
+        count: (prev?.count ?? 0) + 1,
+        image: prev?.image ?? i['image_url'] as String?,
+      );
+    }
+    final list = map.entries
+        .map((e) => (name: e.key, count: e.value.count, image: e.value.image))
+        .toList()
+      ..sort((a, b) => b.count.compareTo(a.count));
+    return list.take(6).toList();
+  }
+
+  void _startShopping() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateListPage(
+          initialFilterCategory: widget.categoryName,
+          availableCategories: [
+            {'name': widget.categoryName}
+          ],
+          customPrimarySwatch: widget.customPrimarySwatch,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final double completionRate = _totalCategoryItems > 0 ? _completedCategoryItems / _totalCategoryItems : 0.0;
-    final Color primaryColor = widget.customPrimarySwatch;
+    final scheme = Theme.of(context).colorScheme;
+    final emoji = categoryEmoji(widget.categoryName);
+    final top = _topProducts;
+    final maxCount = top.isEmpty ? 1 : top.first.count;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.categoryName} Detayları'),
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(title: Text('$emoji  ${widget.categoryName}')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Toplam Ürün: $_totalCategoryItems',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tamamlanan Ürün: $_completedCategoryItems',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tamamlama Oranı: ${(completionRate * 100).toStringAsFixed(1)}%',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      LinearProgressIndicator(
-                        value: completionRate,
-                        backgroundColor:
-                            Theme.of(context).colorScheme.surfaceContainerHighest,
-                        color: primaryColor,
-                        minHeight: 10,
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                    ],
-                  ),
+                Text('Bu kategorideki alışveriş geçmişin',
+                    style: TextStyle(color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                        child: MiniStatCard(
+                            value: '${_items.length}', label: 'Toplam')),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: MiniStatCard(
+                            value: '$_completed', label: 'Tamamlanan')),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: MiniStatCard(
+                            value: '$_thisMonth', label: 'Bu Ay')),
+                  ],
                 ),
-                const Divider(),
-                Expanded(
-                  child: _categoryItems.isEmpty
-                      ? Center(
-                          child: Text(
-                              '${widget.categoryName} kategorisinde hiç ürün yok.',
-                              style: TextStyle(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant)))
-                      : ListView.builder(
-                          itemCount: _categoryItems.length,
-                          itemBuilder: (context, index) {
-                            final item = _categoryItems[index];
-                            final productName = item['product_name'] ?? 'İsimsiz Ürün';
-                            final isCompleted = item['is_completed'] ?? false;
-                            
-                            // Liste adını shopping_lists'tan çekiyoruz
-                            // item['shopping_lists'] bir Map veya null olabilir, güvenli erişim
-                            final listName = (item['shopping_lists'] as Map<String, dynamic>?)?['name'] as String? ?? 'Bilinmeyen Liste';
-
-                            return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              child: CheckboxListTile(
-                                title: Text(
-                                  productName,
-                                  style: TextStyle(
-                                    decoration: isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : TextDecoration.none,
-                                    color: isCompleted
-                                        ? Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant
-                                        : Theme.of(context)
-                                            .colorScheme
-                                            .onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Liste: $listName',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant),
-                                ),
-                                value: isCompleted,
-                                onChanged: (bool? newValue) {
-                                  _toggleItemCompletion(item['id'], item['is_completed']);
-                                },
-                                activeColor: primaryColor, // Tema rengi
-                              ),
-                            );
-                          },
-                        ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.schedule,
+                        size: 15, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Text('Son alışveriş: $_lastPurchase',
+                        style: TextStyle(
+                            fontSize: 12, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text('En Çok Alınan Ürünler',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onSurface)),
+                const SizedBox(height: 12),
+                if (top.isEmpty)
+                  Text('Bu kategoride henüz ürün yok.',
+                      style: TextStyle(color: scheme.onSurfaceVariant))
+                else
+                  ...top.map((p) => _productRow(scheme, p, maxCount)),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: _startShopping,
+                    icon: const Icon(Icons.shopping_cart_outlined),
+                    label: const Text('Alışverişe Başla'),
+                  ),
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _productRow(ColorScheme scheme,
+      ({String name, int count, String? image}) p, int maxCount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          ProductThumb(
+            imageUrl: p.image,
+            emoji: categoryEmoji(widget.categoryName),
+            size: 38,
+            radius: 10,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(p.name,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, color: scheme.onSurface),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ),
+          SizedBox(
+            width: 80,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: p.count / maxCount,
+                minHeight: 6,
+                backgroundColor: scheme.primary.withValues(alpha: 0.12),
+                color: scheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text('${p.count} kez',
+              style: TextStyle(
+                  fontSize: 11, color: scheme.onSurfaceVariant)),
+        ],
+      ),
     );
   }
 }
