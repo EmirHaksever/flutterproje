@@ -342,9 +342,10 @@ class _HomePageState extends State<HomePage> {
             return Container(
               height: MediaQuery.of(context).size.height * 0.8, // Ekranın %80'i kadar
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(25)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +396,7 @@ class _HomePageState extends State<HomePage> {
                         }
 
                         return CheckboxListTile(
-                          title: Text(category['name'], style: const TextStyle(color: Colors.black87)),
+                          title: Text(category['name']),
                           secondary: Icon(category['icon'] as IconData, color: categoryModalColors[0]), // Renk güncellendi
                           value: isSelected,
                           onChanged: (bool? newValue) {
@@ -476,17 +477,10 @@ class _HomePageState extends State<HomePage> {
     return "İyi Akşamlar";
   }
 
-  // Günün saatine göre degrade renkler
+  // Karşılama kartı degradesi — tema ana renginden türetilir (koyu modda da uyumlu).
   List<Color> getGreetingCardGradientColors() {
-    final hour = DateTime.now().hour;
-    // Turkuaz temasıyla uyumlu daha soft tonlar
-    if (hour >= 6 && hour < 12) { // Sabah (Hafif ve sıcak tonlar)
-      return [const Color(0xFFE0FFFF), const Color(0xFFC8F7EE)]; // Açık Camgöbeği - Açık Turkuaz
-    } else if (hour >= 12 && hour < 18) { // Öğlen (Ferahlatıcı tonlar)
-      return [const Color(0xFFB2EBF2), const Color(0xFF80DEEA)]; // Orta Camgöbeği - Turkuaz
-    } else { // Akşam ve Gece (Daha dingin ve huzurlu tonlar)
-      return [const Color(0xFF00ACC1), const Color(0xFF00838F)]; // Koyu Turkuaz - Koyu Deniz Mavisi
-    }
+    final primary = Theme.of(context).colorScheme.primary;
+    return [primary, Color.lerp(primary, Colors.black, 0.28)!];
   }
 
   // Yazılara hafif gölge ekleyen TextShadow listesi
@@ -630,46 +624,41 @@ class _HomePageState extends State<HomePage> {
   Widget _buildUnifiedCard({
     required Widget child,
     EdgeInsetsGeometry? padding,
-    double elevation = 5,
-    Color color = Colors.white,
-    double borderRadius = 20,
+    Color? color,
+    double borderRadius = 16,
     EdgeInsetsGeometry? margin,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      margin: margin ?? const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+      margin: margin ?? const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: color,
+        color: color ?? scheme.surface,
         borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.15),
-            spreadRadius: 2,
-            blurRadius: elevation,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(20),
         child: child,
-      ), // <-- Düzeltilen yer
+      ),
     );
   }
 
-  Widget _buildSectionTitle(String text, {IconData? icon, Color? iconColor, double fontSize = 22}) {
+  Widget _buildSectionTitle(String text,
+      {IconData? icon, Color? iconColor, double fontSize = 20}) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (icon != null) Icon(icon, color: iconColor ?? Colors.grey.shade700, size: 28),
+          if (icon != null)
+            Icon(icon, color: iconColor ?? scheme.primary, size: 26),
           if (icon != null) const SizedBox(width: 10),
           Text(
             text,
             style: TextStyle(
               fontSize: fontSize,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
+              color: scheme.onSurface,
             ),
           ),
         ],
@@ -756,69 +745,46 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // _buildAISuggestionCard güncellendi: Resim yerine sadece metin ve bir ikon kullanıyor
   Widget _buildAISuggestionCard(String productName) {
-    final Color globalPrimaryColor = widget.customPrimarySwatch;
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: 120,
-      margin: const EdgeInsets.only(right: 15),
+      width: 130,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center, // Ortala
-        mainAxisAlignment: MainAxisAlignment.center, // Ortala
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Ürünü temsil eden bir ikon
-          Icon(
-            Icons.lightbulb_outline, // Öneri için genel bir ampul ikonu
-            size: 40,
-            color: globalPrimaryColor,
-          ),
+          Icon(Icons.lightbulb_outline, size: 34, color: scheme.primary),
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              productName,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center, // Metni ortala
-              maxLines: 2, // Metin sığmazsa iki satıra düşebilir
-              overflow: TextOverflow.ellipsis,
+          Text(
+            productName,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: scheme.onSurface,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
-          InkWell(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('"$productName" listenize eklendi!')),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: globalPrimaryColor.withValues(alpha: 0.1), // Temanın ana rengini kullanır
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Ekle',
-                style: TextStyle(color: globalPrimaryColor, fontWeight: FontWeight.bold, fontSize: 12),
-              ),
+          const SizedBox(height: 10),
+          FilledButton.tonal(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('"$productName" listene eklendi!')),
             ),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 32),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Ekle', style: TextStyle(fontSize: 12)),
           ),
         ],
       ),
@@ -826,77 +792,71 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildProductListItem(String productName, int count, Color accentColor) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
           Container(
-            width: 45,
-            height: 45,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.15),
+              color: accentColor.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.shopping_bag_outlined, color: accentColor, size: 26),
+            child:
+                Icon(Icons.shopping_bag_outlined, color: accentColor, size: 24),
           ),
-          const SizedBox(width: 15),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   productName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: Colors.black87,
+                    fontSize: 15,
+                    color: scheme.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  '$count kez alındı',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 13,
-                  ),
-                ),
+                Text('$count kez alındı',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant, fontSize: 12)),
               ],
             ),
           ),
-          Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey.shade400),
+          Icon(Icons.chevron_right, size: 20, color: scheme.onSurfaceVariant),
         ],
       ),
     );
   }
 
   Widget _buildStatItem(String title, String value, IconData icon, Color color) {
+    final scheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 30, color: color),
+            child: Icon(icon, size: 26, color: color),
           ),
           const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: scheme.onSurface)),
           const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-            textAlign: TextAlign.center,
-          ),
+          Text(title,
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              textAlign: TextAlign.center),
         ],
       ),
     );
@@ -914,57 +874,57 @@ class _HomePageState extends State<HomePage> {
         .where((name) => name.isNotEmpty)
         .toList() ?? [];
 
-    final date = DateFormat('dd MMM', 'tr_TR').format(DateTime.parse(list['created_at']));
-    
+    final date = DateFormat('dd MMM', 'tr_TR')
+        .format(DateTime.parse(list['created_at']));
+    final scheme = Theme.of(context).colorScheme;
+
     return InkWell(
       onTap: () => Navigator.pushNamed(
         context,
         '/listDetail',
-        arguments: {'id': list['id'], 'name': list['name'], 'user_id': list['user_id']}, // user_id'yi de geçiriyoruz
+        arguments: {
+          'id': list['id'],
+          'name': list['name'],
+          'user_id': list['user_id'],
+        },
       ),
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: 180,
-        padding: const EdgeInsets.all(15),
-        margin: const EdgeInsets.only(right: 15),
+        width: 190,
+        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withValues(alpha: 0.1),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.assignment, color: Theme.of(context).primaryColor, size: 30), // Temanın ana rengini kullanır
-            const SizedBox(height: 10),
+            Icon(Icons.assignment_outlined, color: scheme.primary, size: 26),
+            const SizedBox(height: 8),
             Text(
-              list['name'],
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.black87,
-              ),
+              list['name'] ?? 'İsimsiz',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: scheme.onSurface),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            Text(
-              '$itemCount Ürün • $date',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            ),
-            if (productNames.isNotEmpty) ...[ // Ürün adları varsa göster
-              const SizedBox(height: 8),
+            Text('$itemCount ürün • $date',
+                style:
+                    TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+            if (productNames.isNotEmpty) ...[
+              const SizedBox(height: 6),
               Text(
-                productNames.join(', '), // Ürün adlarını virgülle ayırarak göster
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 11),
+                productNames.join(', '),
+                style: TextStyle(
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                    fontSize: 11),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -982,7 +942,7 @@ class _HomePageState extends State<HomePage> {
     final Color globalPrimaryColor = globalPrimarySwatch;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -1129,17 +1089,23 @@ class _HomePageState extends State<HomePage> {
                           const SizedBox(height: 20),
 
                           // 2. Bugünün Önerileri (Akıllı AI) Bölümü
-                          _buildSectionTitle('Bugünün Önerileri ✨', iconColor: const Color(0xFFFFAD60)),
+                          _buildSectionTitle('Bugünün Önerileri ✨'),
                           SizedBox(
-                            height: 190,
+                            height: 172,
                             child: suggestedToday.isEmpty
-                                ? const Center(child: Text('Hiç öneri yok. Daha fazla ürün ekledikçe öneriler gelecektir.', style: TextStyle(color: Colors.grey)))
+                                ? Center(
+                                    child: Text(
+                                        'Hiç öneri yok. Daha fazla ürün ekledikçe öneriler gelecek.',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)))
                                 : ListView.builder(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: suggestedToday.length,
-                                    itemBuilder: (context, index) {
-                                      return _buildAISuggestionCard(suggestedToday[index]);
-                                    },
+                                    itemBuilder: (context, index) =>
+                                        _buildAISuggestionCard(
+                                            suggestedToday[index]),
                                   ),
                           ),
 
@@ -1225,7 +1191,7 @@ class _HomePageState extends State<HomePage> {
                                       );
                                     }).toList(),
                                   ),
-                                const Divider(height: 30, thickness: 1, color: Color.fromARGB(255, 234, 231, 231)),
+                                const Divider(height: 30),
 
                                 // Alışveriş İstatistikleri
                                 _buildSectionTitle('Alışveriş İstatistikleri 📊', fontSize: 20, iconColor: globalPrimaryColor), 
@@ -1251,8 +1217,9 @@ class _HomePageState extends State<HomePage> {
                                   const SizedBox(height: 15),
                                   LinearProgressIndicator(
                                     value: completedItems / totalItems,
-                                    backgroundColor: Colors.grey.shade200,
-                                    color: widget.customPrimarySwatch.shade400, // widget.customPrimarySwatch kullanıldı
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest,
                                     borderRadius: BorderRadius.circular(10),
                                     minHeight: 12,
                                   ),
@@ -1348,17 +1315,23 @@ class _HomePageState extends State<HomePage> {
                           const SizedBox(height: 30),
 
                           // 6. Son Listelerim Bölümü (Arama tarafından filtrelenir)
-                          _buildSectionTitle('Son Listelerim 📋', iconColor: globalPrimaryColor), 
+                          _buildSectionTitle('Son Listelerim 📋'),
                           SizedBox(
-                            height: 150, // Yüksekliği sabit tuttuk, içindeki ürün adları taşabilir.
-                            child: _filteredShoppingLists.isEmpty // Filtrelenmiş listeyi kullan
-                                ? const Center(child: Text('Kaydedilmiş alışveriş listeniz bulunmamaktadır veya arama sonucu bulunamadı.', style: TextStyle(color: Colors.grey)))
+                            height: 150,
+                            child: _filteredShoppingLists.isEmpty
+                                ? Center(
+                                    child: Text(
+                                        'Kaydedilmiş liste yok veya arama sonucu bulunamadı.',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)))
                                 : ListView.builder(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: _filteredShoppingLists.length,
-                                    itemBuilder: (context, index) {
-                                      return _buildRecentListItemCard(_filteredShoppingLists[index]);
-                                    },
+                                    itemBuilder: (context, index) =>
+                                        _buildRecentListItemCard(
+                                            _filteredShoppingLists[index]),
                                   ),
                           ),
 
@@ -1376,12 +1349,12 @@ class _HomePageState extends State<HomePage> {
                 top: 240, // Arama çubuğunun hemen altına gelecek şekilde ayarlandı
                 left: 20,
                 right: 20,
-                child: Material( // Gölgeli bir kart içinde gösterilmesi için Material widget
+                child: Material(
                   elevation: 8,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(15),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
                       borderRadius: BorderRadius.circular(15),
                     ),
                     constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.3), // Maksimum yükseklik
@@ -1396,8 +1369,12 @@ class _HomePageState extends State<HomePage> {
                           title: Text(
                             suggestion,
                             style: TextStyle(
-                              color: isAIQuery ? globalPrimaryColor : Colors.black87, // AI için primaryColor
-                              fontWeight: isAIQuery ? FontWeight.bold : FontWeight.normal,
+                              color: isAIQuery
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.onSurface,
+                              fontWeight: isAIQuery
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                           trailing: Icon(

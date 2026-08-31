@@ -407,6 +407,7 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
                   ScaleTransition(
                     scale: _sendButtonScaleAnimation,
                     child: FloatingActionButton(
+                      heroTag: 'aiChatSendFab',
                       onPressed: isLoading ? null : () => sendMessage(_controller.text),
                       mini: false, // Daha büyük bir FAB
                       backgroundColor: const Color(0xFF8E24AA), // Mor tonu

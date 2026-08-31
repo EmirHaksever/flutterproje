@@ -344,6 +344,7 @@ class _MyListsPageState extends State<MyListsPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'myListsFab', // IndexedStack'te birden çok FAB olduğu için benzersiz tag
         onPressed: _openCreateList,
         icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
         label: const Text('Yeni Liste Oluştur',
