@@ -327,16 +327,8 @@ class _MyListsPageState extends State<MyListsPage> {
     });
 
     try {
-      await supabase
-          .from('list_items')
-          .delete()
-          .eq('list_id', listId);
-
-      await supabase
-          .from('shared_lists')
-          .delete()
-          .eq('list_id', listId);
-
+      // list_items ve shared_lists, shopping_lists'e ON DELETE CASCADE ile bağlı;
+      // ana satırı silmek bağlı satırları veritabanı seviyesinde atomik olarak siler.
       await supabase
           .from('shopping_lists')
           .delete()
