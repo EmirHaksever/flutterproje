@@ -343,6 +343,7 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
