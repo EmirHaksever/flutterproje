@@ -451,74 +451,73 @@ class _GroceryPainter extends CustomPainter {
     }
 
     void highlight(double x, double y, double r) {
-      p.color = Colors.white.withValues(alpha: 0.55);
+      p.color = Colors.white.withValues(alpha: 0.5);
       canvas.drawCircle(Offset(x, y), r, p);
     }
 
     // Zemin gölgesi
-    p.color = Colors.black.withValues(alpha: 0.07);
+    p.color = Colors.black.withValues(alpha: 0.06);
     canvas.drawOval(
-      Rect.fromCenter(center: Offset(cx, h - 12), width: 140, height: 22),
+      Rect.fromCenter(center: Offset(cx, h - 10), width: 150, height: 22),
       p,
     );
 
-    // Orta yeşillik (brokoli / marul demeti)
-    dot(cx - 6, 44, 15, _greenB);
-    dot(cx + 12, 46, 13, _greenA);
-    dot(cx - 20, 50, 12, _greenA);
-    dot(cx + 2, 34, 11, _greenB);
-
-    // İnce filizler
+    // --- Çantayı dolduran ürünler (rim'in arkasında/üstünde) --------------
+    // Uzun yeşillikler (marul yaprakları) — sepetin arkasından yukarı
     p.color = _greenA;
-    for (final a in [-0.5, -0.1, 0.3]) {
+    for (final a in [-0.5, -0.18, 0.16, 0.42]) {
       canvas.save();
-      canvas.translate(cx, 40);
+      canvas.translate(cx, 62);
       canvas.rotate(a);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-            const Rect.fromLTWH(-3, -26, 6, 26), const Radius.circular(3)),
+            const Rect.fromLTWH(-5, -44, 10, 46), const Radius.circular(5)),
         p,
       );
       canvas.restore();
     }
-
-    // Domates (sol)
-    dot(cx - 36, 56, 16, _tomato);
-    highlight(cx - 42, 50, 4);
+    // Brokoli demeti (sol)
+    dot(cx - 34, 46, 13, _greenB);
+    dot(cx - 22, 40, 10, _greenA);
+    // Domates (sol-orta)
+    dot(cx - 30, 58, 15, _tomato);
+    highlight(cx - 36, 52, 4);
     // Portakal (sağ)
-    dot(cx + 38, 54, 15, _orange);
-    highlight(cx + 32, 48, 4);
-    // Limon (orta-alt)
-    dot(cx + 10, 62, 11, _lemon);
-    highlight(cx + 6, 58, 3);
-
-    // Havuç (sağ-üstten çıkan)
+    dot(cx + 32, 54, 15, _orange);
+    highlight(cx + 26, 48, 4);
+    // Limon (orta)
+    dot(cx + 6, 62, 11, _lemon);
+    highlight(cx + 2, 58, 3);
+    // Havuç (sağdan sarkan)
     canvas.save();
-    canvas.translate(cx + 50, 56);
+    canvas.translate(cx + 46, 46);
     canvas.rotate(0.5);
     p.color = _orange;
-    final carrot = Path()
-      ..moveTo(-8, -14)
-      ..lineTo(8, -14)
-      ..lineTo(0, 20)
-      ..close();
-    canvas.drawPath(carrot, p);
+    canvas.drawPath(
+      Path()
+        ..moveTo(-8, -15)
+        ..lineTo(8, -15)
+        ..lineTo(0, 20)
+        ..close(),
+      p,
+    );
     p.color = _greenA;
-    canvas.drawCircle(const Offset(-3, -16), 4, p);
-    canvas.drawCircle(const Offset(4, -16), 4, p);
+    canvas.drawCircle(const Offset(-4, -17), 4, p);
+    canvas.drawCircle(const Offset(5, -17), 4, p);
     canvas.restore();
 
-    // Sepet ağzı (kıvrık kenar)
+    // --- Sepet ---------------------------------------------------------
+    // Ağız (katlanmış kenar)
     p.color = _basketDark;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 64, 64, 128, 22),
-        const Radius.circular(11),
+        Rect.fromLTWH(cx - 64, 66, 128, 20),
+        const Radius.circular(10),
       ),
       p,
     );
 
-    // Sepet gövdesi (yukarı doğru genişleyen)
+    // Gövde — yukarı doğru genişleyen
     final body = Path()
       ..moveTo(cx - 60, 82)
       ..lineTo(cx + 60, 82)
@@ -555,12 +554,12 @@ class _GroceryPainter extends CustomPainter {
       );
     }
 
-    // Köşe dekorları
-    dot(26, 44, 6, _greenA);
-    dot(w - 24, 92, 5, _greenA);
+    // --- Dekoratif küçük yapraklar / noktalar --------------------------
+    dot(24, 40, 6, _greenA);
+    dot(w - 22, 96, 5, _greenA);
     p.color = const Color(0xFFFFD08A);
-    canvas.drawCircle(Offset(w - 30, 36), 4, p);
-    canvas.drawCircle(const Offset(34, 108), 4, p);
+    canvas.drawCircle(Offset(w - 28, 34), 4, p);
+    canvas.drawCircle(const Offset(32, 110), 4, p);
   }
 
   @override
