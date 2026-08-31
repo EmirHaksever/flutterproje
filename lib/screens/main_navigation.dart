@@ -5,26 +5,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'friends_screen.dart';
 import 'notifications_screen.dart';
 import '../constants/categories.dart';
-
-// Kendi ekranlarınızın importları. Dosya yollarının doğru olduğundan emin olun.
 import 'home.dart';
 import 'create_list.dart';
 import 'profile.dart';
 import 'settings.dart';
 import 'ai_chat.dart';
-import 'stats.dart'; // StatsPage import edildi
-import 'my_lists.dart'; // my_lists.dart import edildi
+import 'stats.dart';
+import 'my_lists.dart';
 
 class MainNavigationPage extends StatefulWidget {
   final void Function() toggleTheme;
   final void Function(Locale) changeLocale;
-  final MaterialColor customPrimarySwatch; // Add this required parameter
+  final MaterialColor customPrimarySwatch;
 
   const MainNavigationPage({
     super.key,
     required this.toggleTheme,
     required this.changeLocale,
-    required this.customPrimarySwatch, // Make it required
+    required this.customPrimarySwatch,
   });
 
   @override
@@ -37,46 +35,36 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   String _userEmail = '';
 
   final supabase = Supabase.instance.client;
-
   List<Map<String, dynamic>> _allAvailableCategories = [];
-
-  late List<Widget> _pages;
-  bool _pagesInitialized = false;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    final swatch = widget.customPrimarySwatch;
+    _pages = [
+      HomePage(customPrimarySwatch: swatch),
+      StatsPage(customPrimarySwatch: swatch),
+      const AIChatPage(),
+      MyListsPage(customPrimarySwatch: swatch),
+      const ProfilePage(),
+    ];
+
     _fetchUserProfile();
-
-    // _pages, build metodunda Theme.of(context) erişilebilirken oluşturulacak.
-    _pages = [];
-
-    _fetchAllAvailableCategories().then((_) {
-      if (mounted) {
-        setState(() {
-          _pagesInitialized = true;
-          // Eğer _selectedIndex geçersiz bir değerse veya boşsa 0'a ayarla
-          if (_selectedIndex >= _pages.length || _pages.isEmpty) {
-            _selectedIndex = 0;
-          }
-        });
-      }
-    });
+    _fetchAllAvailableCategories();
 
     supabase.auth.onAuthStateChange.listen((data) {
-      if (mounted) {
-        final AuthChangeEvent event = data.event;
-        if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.initialSession) {
-          _fetchUserProfile();
-        } else if (event == AuthChangeEvent.signedOut) {
-          setState(() {
-            _userName = 'Misafir';
-            _userEmail = '';
-          });
-          if (mounted) { // Ensure context is still valid before navigating
-            Navigator.pushReplacementNamed(context, '/login');
-          }
-        }
+      if (!mounted) return;
+      final event = data.event;
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.initialSession) {
+        _fetchUserProfile();
+      } else if (event == AuthChangeEvent.signedOut) {
+        setState(() {
+          _userName = 'Misafir';
+          _userEmail = '';
+        });
+        Navigator.pushReplacementNamed(context, '/login');
       }
     });
   }
@@ -87,297 +75,167 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       final discovered = response
           .map((item) => item['category'] as String?)
           .whereType<String>();
-
       if (mounted) {
         setState(() {
           _allAvailableCategories = mergeDiscoveredCategories(discovered);
         });
       }
     } catch (e) {
-      debugPrint('Tüm mevcut kategoriler çekilemedi: $e');
+      debugPrint('Kategoriler çekilemedi: $e');
     }
   }
 
   Future<void> _fetchUserProfile() async {
     final user = supabase.auth.currentUser;
-    if (user != null) {
-      try {
-        final response = await supabase
-            .from('users')
-            .select('name')
-            .eq('id', user.id)
-            .single();
-
-        if (mounted) { // Check mounted before setState
-          setState(() {
-            _userName = response['name'] as String? ?? 'Kullanıcı';
-            _userEmail = user.email ?? 'E-posta Yok';
-          });
-        }
-      } catch (e) {
-        debugPrint('Kullanıcı profili çekilemedi: $e');
-        if (mounted) { // Check mounted before setState
-          setState(() {
-            _userName = 'Kullanıcı';
-            _userEmail = user.email ?? 'E-posta Yok';
-          });
-        }
-      }
-    } else {
-      if (mounted) { // Check mounted before setState
+    if (user == null) {
+      if (mounted) {
         setState(() {
           _userName = 'Misafir';
           _userEmail = '';
         });
       }
+      return;
+    }
+    try {
+      final response = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (mounted) {
+        setState(() {
+          _userName = (response?['name'] as String?)?.trim().isNotEmpty == true
+              ? response!['name'] as String
+              : 'Kullanıcı';
+          _userEmail = user.email ?? '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Profil çekilemedi: $e');
+      if (mounted) {
+        setState(() {
+          _userName = 'Kullanıcı';
+          _userEmail = user.email ?? '';
+        });
+      }
     }
   }
 
-  void _onNavTapped(int index) {
-    final MaterialColor safePrimarySwatch = widget.customPrimarySwatch;
-
-    // "Ekle" butonu (index 3) için özel durum: Yeni bir sayfa açıyoruz, ana indeksi değiştirmemeliyiz.
-    if (index == 3) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CreateListPage(
-            availableCategories: _allAvailableCategories,
-            customPrimarySwatch: safePrimarySwatch, // Parametre olarak gönderildi
-          ),
+  void _openCreateList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateListPage(
+          availableCategories: _allAvailableCategories,
+          customPrimarySwatch: widget.customPrimarySwatch,
         ),
-      );
-    } else {
-      // Diğer tüm butonlar için _selectedIndex'i güncelleyerek IndexedStack'in sayfa değiştirmesini sağlıyoruz.
-      setState(() {
-        _selectedIndex = index;
-      });
-    }
+      ),
+    );
   }
 
   Future<void> _signOut() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('email');
     await prefs.setBool('rememberMe', false);
-
     await supabase.auth.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_pagesInitialized) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    final Color globalPrimaryColor = Theme.of(context).primaryColor;
-    final MaterialColor safePrimarySwatch = widget.customPrimarySwatch;
-
-    // Sayfaları burada, build metodu içinde ve Theme.of(context) erişilebilirken oluşturuyoruz.
-    // 'Ekle' (index 3) için boş bir Container veya varsayılan bir sayfa bırakın,
-    // çünkü bu tab doğrudan Navigator.push ile başka bir sayfa açacak.
-    _pages = [
-      HomePage(customPrimarySwatch: safePrimarySwatch), // index 0
-      StatsPage(customPrimarySwatch: safePrimarySwatch), // index 1
-      const AIChatPage(), // index 2
-      Container(), // index 3: 'Ekle' butonu için yer tutucu, çünkü Navigator.push kullanılıyor
-      MyListsPage(customPrimarySwatch: safePrimarySwatch), // index 4
-      const ProfilePage(), // index 5
-    ];
-
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: globalPrimaryColor,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white.withAlpha((255 * 0.8).round()),
-                    child: const Icon(Icons.person, color: Colors.white, size: 24),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _userName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    _userEmail,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.home_outlined, color: globalPrimaryColor),
-              title: const Text('Ana Sayfa', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                _onNavTapped(0); // Ana Sayfa'ya geçiş
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.psychology_outlined, color: globalPrimaryColor),
-              title: const Text('AI Asistanı', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                _onNavTapped(2); // AI Asistanı'na geçiş
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.bar_chart_outlined, color: globalPrimaryColor),
-              title: const Text('İstatistikler', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                _onNavTapped(1); // İstatistikler'e geçiş
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.history_outlined, color: globalPrimaryColor),
-              title: const Text('Geçmiş Listeler', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                _onNavTapped(4); // Geçmiş Listeler'e geçiş (MyListsPage)
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.group_outlined, color: globalPrimaryColor),
-              title: const Text('Arkadaşlar', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const FriendsScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.notifications_outlined, color: globalPrimaryColor),
-              title: const Text('Bildirimler', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.person_outline, color: globalPrimaryColor),
-              title: const Text('Profil', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                _onNavTapped(5); // Profil'e geçiş
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(Icons.settings_outlined, color: globalPrimaryColor),
-              title: const Text('Ayarlar', style: TextStyle(fontWeight: FontWeight.w500)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => SettingsPage(
-                    toggleTheme: widget.toggleTheme,
-                    changeLocale: widget.changeLocale,
-                )));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Çıkış Yap', style: TextStyle(fontWeight: FontWeight.w500, color: Colors.red)),
-              onTap: _signOut,
-            ),
-          ],
-        ),
-      ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onNavTapped,
-        selectedItemColor: globalPrimaryColor,
-        unselectedItemColor: Colors.grey.shade600,
-        type: BottomNavigationBarType.fixed,
-        showUnselectedLabels: true,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
-            label: 'Ana Sayfa',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            activeIcon: Icon(Icons.bar_chart_rounded),
-            label: 'İstatistikler',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.psychology_outlined),
-            activeIcon: Icon(Icons.psychology),
-            label: 'AI Asistan',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            activeIcon: Icon(Icons.add_circle_rounded),
-            label: 'Ekle',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_outlined),
-            activeIcon: Icon(Icons.history_rounded),
-            label: 'Geçmiş',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person_rounded),
-            label: 'Profil',
-          ),
+      drawer: _buildDrawer(scheme),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: 'Ana Sayfa'),
+          NavigationDestination(
+              icon: Icon(Icons.bar_chart_outlined),
+              selectedIcon: Icon(Icons.bar_chart_rounded),
+              label: 'İstatistik'),
+          NavigationDestination(
+              icon: Icon(Icons.psychology_outlined),
+              selectedIcon: Icon(Icons.psychology_rounded),
+              label: 'AI'),
+          NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long_rounded),
+              label: 'Listeler'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person_rounded),
+              label: 'Profil'),
         ],
       ),
-      floatingActionButton: (_selectedIndex == 0 || _selectedIndex == 3) && _pagesInitialized
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                // Use widget.customPrimarySwatch which is already a MaterialColor
-                final MaterialColor safePrimarySwatch = widget.customPrimarySwatch;
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openCreateList,
+        tooltip: 'Yeni Liste',
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
 
-                // CreateListPage'i FAB'dan açarken de Navigator.push kullanıyoruz.
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CreateListPage(
-                      availableCategories: _allAvailableCategories,
-                      customPrimarySwatch: safePrimarySwatch, // Parametre olarak gönderildi
-                    ),
-                  ),
-                );
-              },
-              label: const Text("Yeni Liste Oluştur", style: TextStyle(fontWeight: FontWeight.bold)),
-              icon: const Icon(Icons.add),
-              backgroundColor: globalPrimaryColor,
-              foregroundColor: Colors.white,
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+  Widget _buildDrawer(ColorScheme scheme) {
+    Widget tile(IconData icon, String label, VoidCallback onTap,
+        {Color? color}) {
+      return ListTile(
+        leading: Icon(icon, color: color ?? scheme.onSurfaceVariant),
+        title: Text(label,
+            style: TextStyle(
+                fontWeight: FontWeight.w500, color: color)),
+        onTap: () {
+          Navigator.pop(context);
+          onTap();
+        },
+      );
+    }
+
+    void go(int i) => setState(() => _selectedIndex = i);
+    void push(Widget page) => Navigator.push(
+        context, MaterialPageRoute(builder: (_) => page));
+
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          UserAccountsDrawerHeader(
+            decoration: BoxDecoration(color: scheme.primary),
+            accountName: Text(_userName,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            accountEmail: Text(_userEmail),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: scheme.onPrimary,
+              child: Icon(Icons.person, color: scheme.primary),
+            ),
+          ),
+          tile(Icons.home_outlined, 'Ana Sayfa', () => go(0)),
+          tile(Icons.bar_chart_outlined, 'İstatistikler', () => go(1)),
+          tile(Icons.psychology_outlined, 'AI Asistanı', () => go(2)),
+          tile(Icons.receipt_long_outlined, 'Listelerim', () => go(3)),
+          tile(Icons.person_outline, 'Profil', () => go(4)),
+          const Divider(),
+          tile(Icons.group_outlined, 'Arkadaşlar',
+              () => push(const FriendsScreen())),
+          tile(Icons.notifications_outlined, 'Bildirimler',
+              () => push(const NotificationsScreen())),
+          tile(
+              Icons.settings_outlined,
+              'Ayarlar',
+              () => push(SettingsPage(
+                    toggleTheme: widget.toggleTheme,
+                    changeLocale: widget.changeLocale,
+                  ))),
+          const Divider(),
+          tile(Icons.logout, 'Çıkış Yap', _signOut, color: scheme.error),
+        ],
+      ),
     );
   }
 }
