@@ -1,11 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
-import 'package:intl/intl.dart'; // For date formatting
-import 'package:dropdown_button2/dropdown_button2.dart'; // For enhanced dropdowns
+import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../repositories/image_repository.dart';
 import '../repositories/list_repository.dart';
 import '../repositories/sharing_repository.dart';
+import '../widgets/ui_kit.dart';
 
 class ListDetailPage extends StatefulWidget {
   final Map<String, dynamic> listData;
@@ -20,23 +23,20 @@ class _ListDetailPageState extends State<ListDetailPage> {
   final supabase = Supabase.instance.client;
   final ListRepository _listRepo = ListRepository();
   final SharingRepository _sharingRepo = SharingRepository();
+  final ImageRepository _imageRepo = ImageRepository();
+  final ImagePicker _picker = ImagePicker();
+
   late String currentUserId;
   String listOwnerEmail = '';
   List<Map<String, dynamic>> _items = [];
   List<String> _sharedEmails = [];
   bool _hideCompleted = false;
-  bool _isChanged = false; // To track if changes need saving
-  RealtimeChannel? _itemsChannel; // Items için mevcut kanal
-  RealtimeChannel? _listCompletionChannel; // Yeni: Liste tamamlanma oranı için kanal
-  // Timer? _debounce; // Debounce'ı test amaçlı kaldırdık
+  RealtimeChannel? _itemsChannel;
+  RealtimeChannel? _listCompletionChannel;
 
-  // New state variables for filtering
-  String? _selectedMarketFilter;
-  String? _selectedCategoryFilter;
-  List<String> _availableMarkets = ['Tümü']; // 'All' option
-  // Önceden tanımlanmış kategori listesi
-  final List<String> _predefinedCategories = [
-    'Tümü', // 'All' option
+  String? _selectedCategoryFilter; // null = Tümü
+
+  static const List<String> _predefinedCategories = [
     'Gıda',
     'İçecek',
     'Temizlik',
@@ -55,6 +55,8 @@ class _ListDetailPageState extends State<ListDetailPage> {
     'Diğer',
   ];
 
+  bool get _isOwner => widget.listData['user_id'] == currentUserId;
+
   @override
   void initState() {
     super.initState();
@@ -62,46 +64,44 @@ class _ListDetailPageState extends State<ListDetailPage> {
     _checkAccessAndInitialize();
   }
 
+  @override
+  void dispose() {
+    _itemsChannel?.unsubscribe();
+    _listCompletionChannel?.unsubscribe();
+    super.dispose();
+  }
+
   Future<void> _checkAccessAndInitialize() async {
     final listId = widget.listData['id'];
     final hasAccess = await _checkUserHasAccess(listId, currentUserId);
     if (!hasAccess) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bu listeye erişim hakkınız yok.')),
-        );
-        Navigator.pop(context); // Go back if no access
+        _snack('Bu listeye erişim hakkın yok.');
+        Navigator.pop(context);
       }
       return;
     }
 
-    // Liste Adını çek, eğer listData içinde yoksa (Popüler Kategoriler gibi durumlarda)
-    if (widget.listData['name'] == null || widget.listData['name'].isEmpty) {
-      final listInfoResponse = await supabase
+    if (widget.listData['name'] == null ||
+        (widget.listData['name'] as String).isEmpty) {
+      final info = await supabase
           .from('shopping_lists')
           .select('name')
           .eq('id', widget.listData['id'])
           .maybeSingle();
-
-      if (listInfoResponse != null && mounted) {
-        setState(() {
-          widget.listData['name'] = listInfoResponse['name']; // listData'yı güncelle
-        });
+      if (info != null && mounted) {
+        setState(() => widget.listData['name'] = info['name']);
       }
     }
 
-    // Fetch owner information
     await _fetchListOwnerEmail(widget.listData['user_id'] as String);
-
-    // Initialize items, shared users and realtime subscription
     await _fetchItems();
     await _fetchSharedUsers();
-    _subscribeToRealtimeItems(); // Ürünler için realtime dinleyiciyi başlat
-    _setupCompletionRateRealtimeListener(); // Yeni: Tamamlanma oranı için realtime dinleyiciyi başlat
+    _subscribeToRealtimeItems();
+    _setupCompletionRateRealtimeListener();
   }
 
   Future<bool> _checkUserHasAccess(String listId, String userId) async {
-    // 1) Is owner?
     final listRes = await supabase
         .from('shopping_lists')
         .select('user_id')
@@ -109,7 +109,6 @@ class _ListDetailPageState extends State<ListDetailPage> {
         .maybeSingle();
     if (listRes != null && listRes['user_id'] == userId) return true;
 
-    // 2) Is a shared user?
     final sharedRes = await supabase
         .from('shared_lists')
         .select()
@@ -125,41 +124,15 @@ class _ListDetailPageState extends State<ListDetailPage> {
         .eq('id', ownerId)
         .maybeSingle();
     if (mounted) {
-      setState(() {
-        listOwnerEmail = res?['email'] ?? 'Bilinmiyor';
-      });
+      setState(() => listOwnerEmail = res?['email'] ?? 'Bilinmiyor');
     }
   }
 
-  @override
-  void dispose() {
-    // _debounce?.cancel(); // Debounce kaldırıldığı için iptale gerek yok
-    _itemsChannel?.unsubscribe(); 
-    _listCompletionChannel?.unsubscribe(); 
-    super.dispose();
-  }
-
-  // Ürünler (list_items) için gerçek zamanlı dinleyici
   void _subscribeToRealtimeItems() {
     _itemsChannel = supabase
-        .channel('public:list_items_detail_page_items') // Benzersiz kanal adı
+        .channel('public:list_items_detail_page_items')
         .onPostgresChanges(
-          event: PostgresChangeEvent.update, 
-          schema: 'public',
-          table: 'list_items',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq, 
-            column: 'list_id', 
-            value: widget.listData['id'], 
-          ),
-          callback: (payload) {
-            debugPrint('list_detail Realtime: list_items UPDATE event received for list ID: ${widget.listData['id']}.');
-            debugPrint('  New record: ${payload.newRecord}');
-            _fetchItems(); // Değişiklik olduğunda öğeleri yeniden çek
-          },
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert, 
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'list_items',
           filter: PostgresChangeFilter(
@@ -167,102 +140,47 @@ class _ListDetailPageState extends State<ListDetailPage> {
             column: 'list_id',
             value: widget.listData['id'],
           ),
-          callback: (payload) {
-            debugPrint('list_detail Realtime: list_items INSERT event received for list ID: ${widget.listData['id']}.');
-            debugPrint('  New record: ${payload.newRecord}');
-            _fetchItems(); 
-          },
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.delete, 
-          schema: 'public',
-          table: 'list_items',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'list_id',
-            value: widget.listData['id'],
-          ),
-          callback: (payload) {
-            debugPrint('list_detail Realtime: list_items DELETE event received for list ID: ${widget.listData['id']}.');
-            debugPrint('  Old record: ${payload.oldRecord}');
-            _fetchItems(); 
-          },
+          callback: (_) => _fetchItems(),
         )
         .subscribe();
-
-        debugPrint('list_detail Realtime listener subscribed for list_items on list ID: ${widget.listData['id']}.');
   }
 
-  // Yeni: Tamamlanma oranı (shopping_lists) için gerçek zamanlı dinleyici
   void _setupCompletionRateRealtimeListener() {
     _listCompletionChannel = supabase
-        .channel('public:shopping_lists_detail_page_completion_rate') // Benzersiz kanal adı
+        .channel('public:shopping_lists_detail_page_completion_rate')
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'shopping_lists',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
-            column: 'id', // Listenin ID'sini filtrele
+            column: 'id',
             value: widget.listData['id'],
           ),
-          callback: (payload) {
-            debugPrint('list_detail Realtime: shopping_lists UPDATE event received for completion_rate on list ID: ${widget.listData['id']}.');
-            debugPrint('  New record (completion_rate): ${payload.newRecord}');
-            if (mounted) {
-              setState(() {
-                // Burada _items listesini doğrudan güncellemeyeceğiz, çünkü _itemsChannel zaten bunu yapacak.
-                // Sadece UI'ın yeniden çizilmesi için setState'i tetiklemek yeterli.
-                // _completionRate() getter'ı, her çizimde _items'ın güncel durumuna göre yeniden hesaplanacaktır.
-                debugPrint('list_detail: Completion rate UI update triggered by shopping_lists event. New rate: ${(payload.newRecord['completion_rate'] as num?)?.toDouble() ?? 0.0}');
-              });
-            }
+          callback: (_) {
+            if (mounted) setState(() {});
           },
         )
         .subscribe();
-    debugPrint('list_detail Realtime listener subscribed for shopping_lists completion_rate on list ID: ${widget.listData['id']}.');
   }
 
-
   Future<void> _fetchItems() async {
-    debugPrint('list_detail: _fetchItems() called for list ID: ${widget.listData['id']}.');
     try {
       final response = await supabase
           .from('list_items')
-          .select('*') 
+          .select('*')
           .eq('list_id', widget.listData['id'])
-          .order('created_at', ascending: true); 
-
+          .order('created_at', ascending: true);
       if (mounted) {
-        setState(() {
-          _items = List<Map<String, dynamic>>.from(response as List);
-          debugPrint('list_detail: _items state updated. Now has ${_items.length} items.');
-
-          // Populate available markets for filters (categories use predefined now)
-          Set<String> markets = {'Tümü'};
-          for (var item in _items) {
-            if (item['market'] != null && (item['market'] as String).isNotEmpty) {
-              markets.add(item['market'] as String);
-            }
-          }
-          _availableMarkets = markets.toList();
-          // _fetchItems çağrıldığında tamamlanma oranını da hemen güncelleyelim.
-          // Bu, `list_items` tablosundaki bir değişiklikten sonra completion rate'in UI'da hemen güncellenmesini sağlar.
-          // Zaten `_updateCompletionRate` çağrılıyor, ama bu setState'i tetikler ve UI'ı çizdirir.
-          // Eğer _updateCompletionRate() hemen çağrılmazsa, UI'da değişim hemen görülmeyebilir.
-          // Ancak dikkat: _updateCompletionRate() içindeki db çağrısı zaten Realtime eventini tetikleyecektir.
-          // Buradaki setState sadece _items değiştiğinde UI'ın yenilenmesini sağlar.
-          final newRate = _completionRate();
-          debugPrint('list_detail: _fetchItems() completed, calculated completion rate: ${newRate * 100}%');
-        });
+        setState(() =>
+            _items = List<Map<String, dynamic>>.from(response as List));
       }
     } catch (e) {
-      debugPrint('list_detail: Error fetching items: $e');
+      debugPrint('list_detail: ürünler çekilemedi: $e');
     }
   }
 
   Future<void> _fetchSharedUsers() async {
-    debugPrint('list_detail: _fetchSharedUsers() called for list ID: ${widget.listData['id']}.');
     try {
       final response = await supabase
           .from('shared_lists')
@@ -274,17 +192,13 @@ class _ListDetailPageState extends State<ListDetailPage> {
               .map((e) => e['users']?['email'] as String?)
               .whereType<String>()
               .toList();
-          debugPrint('list_detail: Shared emails updated. Now has ${_sharedEmails.length} shared users.');
         });
       }
     } catch (e) {
-      debugPrint('list_detail: Error fetching shared users: $e');
+      debugPrint('list_detail: paylaşılan kullanıcılar çekilemedi: $e');
     }
   }
 
-  /// Listedeki diğer katılımcılara bildirim yazar. İş sunucudaki
-  /// `notify_list_participants` fonksiyonunda yapılır (erişim kontrolü +
-  /// çağıran hariç herkese insert). Başarısızlık sessizce yutulur.
   Future<void> _notifyParticipants(String changeMessage) async {
     final listName = widget.listData['name'] ?? 'Alışveriş Listesi';
     try {
@@ -297,407 +211,310 @@ class _ListDetailPageState extends State<ListDetailPage> {
     }
   }
 
+  Future<void> _toggleItemComplete(Map<String, dynamic> item) async {
+    final index = _items.indexOf(item);
+    if (index == -1) return;
+    final newStatus = !(item['is_completed'] ?? false);
+    final name = item['product_name'] ?? 'bir ürün';
 
-  Future<void> _toggleItemComplete(int index) async {
-    final item = _items[index];
-    final updatedStatus = !(item['is_completed'] ?? false);
-    final String productName = item['product_name'] ?? 'bir ürün';
-    
-    // Optimistic update (UI'ı hemen güncelle)
-    setState(() {
-      _items[index]['is_completed'] = updatedStatus;
-      _isChanged = true;
-      debugPrint('list_detail: Optimistically updated item "$productName" to completed: $updatedStatus.');
-    });
-
+    setState(() => _items[index]['is_completed'] = newStatus);
     try {
       await supabase
           .from('list_items')
-          .update({'is_completed': updatedStatus})
-          .eq('id', item['id']);
-      debugPrint('list_detail: Database update successful for item "$productName".');
-      
-      // Tamamlama oranını güncelle - debounce kaldırıldı
-      await _updateCompletionRate(); 
-
-      // Bildirim gönder
-      final String notificationMessage = updatedStatus ? '$productName tamamlandı.' : '$productName tamamlanmadı olarak işaretlendi.';
-      await _notifyParticipants(notificationMessage);
-
+          .update({'is_completed': newStatus}).eq('id', item['id']);
+      await _updateCompletionRate();
+      await _notifyParticipants(
+          newStatus ? '$name tamamlandı.' : '$name tekrar alınacak.');
     } catch (e) {
-      // Hata durumunda eski durumu geri al
       if (mounted) {
-        setState(() {
-          _items[index]['is_completed'] = !updatedStatus; // Eskiye geri dön
-          _isChanged = true; // Hata oluşsa bile değişiklik var say
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ürün durumu güncellenemedi: $e')),
-        );
-        debugPrint('list_detail: Error updating item "$productName". Reverting optimistic update. Error: $e');
+        setState(() => _items[index]['is_completed'] = !newStatus);
+        _snack('Ürün durumu güncellenemedi.');
       }
     }
   }
 
   Future<void> _updateCompletionRate() async {
-    final rate = _completionRate();
-    debugPrint('list_detail: Attempting to update completion_rate for list ID: ${widget.listData['id']} to $rate');
     try {
-      final response = await supabase
+      await supabase
           .from('shopping_lists')
-          .update({'completion_rate': rate})
-          .eq('id', widget.listData['id'])
-          .select(); // Güncellenen kaydı döndürsün, hata ayıklama için
-      debugPrint('list_detail: Completion rate update response: $response');
-    } on PostgrestException catch (e) {
-      debugPrint('list_detail: PostgrestException during completion rate update: ${e.message}');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tamamlama oranı güncellenirken veritabanı hatası: ${e.message}')),
-        );
-      }
+          .update({'completion_rate': _completionRate()}).eq(
+              'id', widget.listData['id']);
     } catch (e) {
-      debugPrint('list_detail: Error during completion rate update: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tamamlama oranı güncellenirken beklenmedik hata: $e')),
-        );
-      }
+      debugPrint('list_detail: tamamlanma oranı güncellenemedi: $e');
     }
   }
 
-  Future<void> _deleteItem(int index) async {
-    final itemId = _items[index]['id'];
-    final String productName = _items[index]['product_name'] ?? 'bir ürün';
+  Future<void> _deleteItem(Map<String, dynamic> item) async {
+    final index = _items.indexOf(item);
+    if (index == -1) return;
+    final name = item['product_name'] ?? 'bir ürün';
+    final original = Map<String, dynamic>.from(item);
 
-    // Optimistic deletion
-    final originalItem = _items[index];
-    setState(() {
-      _items.removeAt(index);
-      _isChanged = true;
-      debugPrint('list_detail: Optimistically deleted item "$productName".');
-    });
-
+    setState(() => _items.removeAt(index));
     try {
-      await supabase.from('list_items').delete().eq('id', itemId);
-      debugPrint('list_detail: Database delete successful for item "$productName".');
-      await _updateCompletionRate(); // Silme sonrası oranı güncelle
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ürün silindi!')),
-        );
-      }
-      // Bildirim gönder
-      await _notifyParticipants('$productName silindi.');
-
+      await supabase.from('list_items').delete().eq('id', item['id']);
+      await _updateCompletionRate();
+      await _notifyParticipants('$name silindi.');
+      if (mounted) _snack('Ürün silindi.');
     } catch (e) {
-      // Hata durumunda geri al
       if (mounted) {
-        setState(() {
-          _items.insert(index, originalItem); // Eski konuma geri ekle
-          _isChanged = true; // Hata oluşsa bile değişiklik var say
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ürün silinemedi: $e')),
-        );
-        debugPrint('list_detail: Error deleting item "$productName". Reverting optimistic delete. Error: $e');
+        setState(() => _items.insert(index, original));
+        _snack('Ürün silinemedi.');
       }
     }
   }
 
   double _completionRate() {
-    if (_items.isEmpty) {
-      debugPrint('list_detail: _completionRate() called. Items list is empty. Returning 0.');
-      return 0;
-    }
-    final completedCount =
-        _items.where((item) => item['is_completed'] == true).length;
-    final rate = completedCount / _items.length;
-    debugPrint('list_detail: _completionRate() calculated: Completed $completedCount out of ${_items.length} items. Rate: $rate');
-    return rate;
+    if (_items.isEmpty) return 0;
+    final done = _items.where((i) => i['is_completed'] == true).length;
+    return done / _items.length;
   }
 
   List<Map<String, dynamic>> get _visibleItems {
-    Iterable<Map<String, dynamic>> filteredItems = _items;
-
+    Iterable<Map<String, dynamic>> items = _items;
     if (_hideCompleted) {
-      filteredItems = filteredItems.where((item) => item['is_completed'] != true);
+      items = items.where((i) => i['is_completed'] != true);
     }
-    // Apply market filter
-    if (_selectedMarketFilter != null && _selectedMarketFilter != 'Tümü') {
-      filteredItems = filteredItems.where((item) =>
-          (item['market'] as String? ?? '').toLowerCase() ==
-          _selectedMarketFilter!.toLowerCase());
-    }
-    // Apply category filter
-    if (_selectedCategoryFilter != null && _selectedCategoryFilter != 'Tümü') {
-      filteredItems = filteredItems.where((item) =>
-          (item['category'] as String? ?? '').toLowerCase() ==
+    if (_selectedCategoryFilter != null) {
+      items = items.where((i) =>
+          (i['category'] as String? ?? '').toLowerCase() ==
           _selectedCategoryFilter!.toLowerCase());
     }
-    return filteredItems.toList();
+    return items.toList();
   }
 
-  Future<void> _editItemDialog(int index) async {
-    final item = _items[index];
-    final nameCtrl =
-        TextEditingController(text: (item['product_name'] ?? '') as String);
-    final qtyCtrl =
-        TextEditingController(text: '${item['quantity'] ?? 1}');
-    final marketCtrl =
-        TextEditingController(text: (item['market'] ?? '') as String);
-    final tagsCtrl = TextEditingController(
-        text: (item['tags'] is List)
-            ? (item['tags'] as List).join(', ')
-            : '');
+  void _snack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    final scheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? scheme.error : null,
+    ));
+  }
 
-    final saved = await showDialog<bool>(
+  Future<(Uint8List, String)?> _pickImage() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        imageQuality: 78,
+      );
+      if (picked == null) return null;
+      final bytes = await picked.readAsBytes();
+      final ext = picked.name.contains('.')
+          ? picked.name.split('.').last.toLowerCase()
+          : 'jpg';
+      return (bytes, ext);
+    } catch (e) {
+      debugPrint('Resim seçilemedi: $e');
+      if (mounted) _snack('Resim seçilemedi.', error: true);
+      return null;
+    }
+  }
+
+  // --- Ürün ekle / düzenle (alttan açılan sayfa) --------------------------
+
+  Future<void> _itemSheet({Map<String, dynamic>? existing}) async {
+    final editing = existing != null;
+    final nameCtrl = TextEditingController(
+        text: editing ? (existing['product_name'] ?? '') as String : '');
+    final marketCtrl = TextEditingController(
+        text: editing ? (existing['market'] ?? '') as String : '');
+    String? category = editing ? existing['category'] as String? : null;
+    int qty = editing ? (existing['quantity'] as int? ?? 1) : 1;
+    String? currentImageUrl =
+        editing ? existing['image_url'] as String? : null;
+    Uint8List? newBytes;
+    String newExt = 'jpg';
+
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ürünü düzenle'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Ürün adı'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: qtyCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Miktar'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: marketCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Mağaza (opsiyonel)'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: tagsCtrl,
-                decoration: const InputDecoration(
-                    labelText: 'Etiketler (virgülle ayır)'),
-              ),
-            ],
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('İptal')),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Kaydet')),
-        ],
-      ),
+          child: StatefulBuilder(
+            builder: (ctx, setSheet) => SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(editing ? 'Ürünü Düzenle' : 'Ürün Ekle',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: scheme.onSurface)),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () async {
+                          final picked = await _pickImage();
+                          if (picked != null) {
+                            setSheet(() {
+                              newBytes = picked.$1;
+                              newExt = picked.$2;
+                            });
+                          }
+                        },
+                        child: _sheetThumb(scheme, newBytes, currentImageUrl),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: nameCtrl,
+                          autofocus: !editing,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                              hintText: 'Ürün adı (örn: Süt 1 L)'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (newBytes != null || currentImageUrl != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => setSheet(() {
+                          newBytes = null;
+                          currentImageUrl = null;
+                        }),
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text('Fotoğrafı kaldır'),
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  Text('Kategori',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _predefinedCategories.map((c) {
+                      final sel = category == c;
+                      return ChoiceChip(
+                        label: Text(c),
+                        selected: sel,
+                        onSelected: (_) =>
+                            setSheet(() => category = sel ? null : c),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: marketCtrl,
+                    decoration:
+                        const InputDecoration(hintText: 'Mağaza (opsiyonel)'),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Text('Adet',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurface)),
+                      const Spacer(),
+                      _QtyStepper(
+                        value: qty,
+                        onChanged: (v) => setSheet(() => qty = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      onPressed: () {
+                        if (nameCtrl.text.trim().isEmpty) return;
+                        Navigator.pop(ctx, true);
+                      },
+                      child: Text(editing ? 'Kaydet' : 'Ekle'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
     if (saved != true) return;
 
     final name = nameCtrl.text.trim();
-    if (name.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ürün adı boş olamaz.')),
-        );
+    final market = marketCtrl.text.trim();
+
+    // Fotoğraf yükleme
+    String? imageUrl = currentImageUrl;
+    if (newBytes != null) {
+      try {
+        imageUrl = await _imageRepo.uploadProductImage(newBytes!,
+            extension: newExt);
+      } catch (e) {
+        debugPrint('Ürün resmi yüklenemedi: $e');
       }
-      return;
     }
 
     try {
-      await _listRepo.updateItem(
-        item['id'] as String,
-        productName: name,
-        quantity: int.tryParse(qtyCtrl.text.trim()) ?? 1,
-        market: marketCtrl.text.trim(),
-        tags: tagsCtrl.text
-            .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList(),
-      );
-      await _fetchItems();
-      await _notifyParticipants('"$name" güncellendi.');
-    } catch (e) {
-      debugPrint('Ürün güncellenemedi: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ürün güncellenemedi.')),
+      if (editing) {
+        await _listRepo.updateItem(
+          existing['id'] as String,
+          productName: name,
+          quantity: qty,
+          category: category ?? '',
+          market: market,
+          imageUrl: imageUrl ?? '',
         );
+        await _notifyParticipants('"$name" güncellendi.');
+      } else {
+        await supabase.from('list_items').insert({
+          'list_id': widget.listData['id'],
+          'product_name': name,
+          'quantity': qty,
+          'market': market.isEmpty ? null : market,
+          'category': category,
+          'image_url': imageUrl,
+          'is_completed': false,
+        });
+        await _updateCompletionRate();
+        await _notifyParticipants('yeni ürün "$name" eklendi.');
       }
+      await _fetchItems();
+    } catch (e) {
+      debugPrint('Ürün kaydedilemedi: $e');
+      if (mounted) _snack('Ürün kaydedilemedi.', error: true);
     }
   }
 
-  Future<void> _addNewItemDialog() async {
-    final nameController = TextEditingController();
-    final quantityController = TextEditingController(text: '1'); // Default quantity
-    final marketController = TextEditingController();
-    String? selectedCategoryInDialog; // New variable for category selection in dialog
-    final tagsController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Yeni Ürün Ekle', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Ürün Adı',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                autofocus: true, // Auto focus keyboard
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: quantityController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Miktar',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: marketController,
-                decoration: InputDecoration(
-                  labelText: 'Mağaza (Opsiyonel)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Kategori seçimi için DropdownButton2 kullanıldı
-              DropdownButtonHideUnderline(
-                child: DropdownButton2<String>(
-                  isExpanded: true,
-                  hint: Text(
-                    'Kategori Seç (Opsiyonel)',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).hintColor,
-                    ),
-                  ),
-                  items: _predefinedCategories.where((cat) => cat != 'Tümü').map((category) => // 'Tümü' seçeneğini burada gösterme
-                      DropdownMenuItem(value: category, child: Text(category))).toList(),
-                  value: selectedCategoryInDialog,
-                  onChanged: (value) {
-                    setState(() { // AlertDialog'un setState'ini kullanarak güncelle
-                      selectedCategoryInDialog = value;
-                    });
-                  },
-                  buttonStyleData: ButtonStyleData(
-                    padding: const EdgeInsets.only(left: 14, right: 14),
-                    height: 40,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10), // Yuvarlak köşeler
-                      border: Border.all(color: Colors.grey.shade400), // Kenarlık
-                      color: Theme.of(context).colorScheme.surface,
-                    ),
-                  ),
-                  menuItemStyleData: const MenuItemStyleData(
-                    height: 40,
-                  ),
-                  dropdownStyleData: DropdownStyleData( // Dropdown menü stilini güncelle
-                    maxHeight: 200,
-                    width: 200,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: Theme.of(context).colorScheme.surface,
-                    ),
-                    offset: const Offset(0, 0),
-                    scrollbarTheme: ScrollbarThemeData(
-                      radius: const Radius.circular(40),
-                      thickness: WidgetStateProperty.all(6),
-                      thumbVisibility: WidgetStateProperty.all(true),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: tagsController,
-                decoration: InputDecoration(
-                  labelText: 'Etiketler (Virgülle Ayırın, Opsiyonel)',
-                  hintText: 'örn: kahvaltılık, gluten-free',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('İptal', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              final quantity = int.tryParse(quantityController.text.trim()) ?? 1;
-              final market = marketController.text.trim().isNotEmpty ? marketController.text.trim() : null;
-              final category = selectedCategoryInDialog; // Diyalogdan seçilen kategori
-              final tags = tagsController.text.trim().isNotEmpty
-                  ? tagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-                  : null;
-
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ürün adı boş olamaz!')),
-                );
-                return;
-              }
-              final newItem = {
-                'list_id': widget.listData['id'],
-                'product_name': name,
-                'quantity': quantity,
-                'market': market,
-                'category': category,
-                'tags': tags, // Store tags as a List of strings
-                'is_completed': false,
-                'created_at': DateTime.now().toIso8601String(),
-              };
-              try {
-                final response = await supabase
-                    .from('list_items')
-                    .insert(newItem)
-                    .select(); // Return the inserted item
-                if (mounted) {
-                  setState(() {
-                    _items.add((response as List).first);
-                    _isChanged = true;
-                    // Market filtre seçeneklerini güncelle
-                    if (market != null && !_availableMarkets.contains(market)) {
-                      _availableMarkets.add(market);
-                    }
-                    // Kategoriler zaten sabit olduğu için _availableCategories'i güncellemeye gerek yok.
-                  });
-                  Navigator.pop(context);
-                  await _updateCompletionRate(); // Update rate after new item added
-                }
-                // Bildirim gönder
-                await _notifyParticipants('"$name" adlı yeni bir ürün eklendi.');
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Ürün eklenemedi: $e')),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Ekle'),
-          ),
-        ],
+  Widget _sheetThumb(
+      ColorScheme scheme, Uint8List? bytes, String? url) {
+    if (bytes != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.memory(bytes, width: 56, height: 56, fit: BoxFit.cover),
+      );
+    }
+    if (url != null && url.isNotEmpty) {
+      return ProductThumb(imageUrl: url, size: 56);
+    }
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
       ),
+      child: Icon(Icons.add_a_photo_outlined, color: scheme.primary),
     );
   }
 
@@ -706,30 +523,22 @@ class _ListDetailPageState extends State<ListDetailPage> {
     final email = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Listeyi Paylaş',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Listeyi Paylaş'),
         content: TextField(
           controller: emailController,
           autofocus: true,
           keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            labelText: 'Kullanıcının e-posta adresi',
+          decoration: const InputDecoration(
             hintText: 'ornek@email.com',
-            prefixIcon: const Icon(Icons.alternate_email),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            prefixIcon: Icon(Icons.alternate_email),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal')),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, emailController.text.trim()),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-            ),
             child: const Text('Paylaş'),
           ),
         ],
@@ -741,130 +550,55 @@ class _ListDetailPageState extends State<ListDetailPage> {
       final outcome = await _sharingRepo.shareByEmail(
           listId: widget.listData['id'] as String, email: email);
       if (!mounted) return;
-
       final (text, ok) = switch (outcome) {
         ShareOutcome.success => ('Liste paylaşıldı.', true),
         ShareOutcome.invalidEmail => ('Geçerli bir e-posta girin.', false),
-        ShareOutcome.self =>
-          ('Kendi listeni kendinle paylaşamazsın.', false),
+        ShareOutcome.self => ('Kendi listeni kendinle paylaşamazsın.', false),
         ShareOutcome.userNotFound =>
           ('Bu e-posta ile kayıtlı kullanıcı yok.', false),
         ShareOutcome.alreadyShared =>
           ('Bu liste zaten bu kullanıcıyla paylaşılmış.', false),
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(text),
-        backgroundColor: ok ? Colors.green : Colors.red.shade400,
-      ));
+      _snack(text, error: !ok);
       if (ok) await _fetchSharedUsers();
     } catch (e) {
       debugPrint('Paylaşım hatası: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Liste paylaşılırken bir hata oluştu.')),
-        );
-      }
+      if (mounted) _snack('Liste paylaşılırken bir hata oluştu.', error: true);
     }
   }
 
   Future<void> _deleteList() async {
-    // Add confirmation dialog
-    final confirmDelete = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Listeyi Sil', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: const Text('Bu listeyi ve tüm ürünlerini kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('İptal', style: TextStyle(color: Colors.grey)),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red, // Red for delete button
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Sil'),
-              ),
-            ],
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Listeyi Sil'),
+        content: const Text(
+            'Bu listeyi ve tüm ürünlerini kalıcı olarak silmek istiyor musun? '
+            'Bu işlem geri alınamaz.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil'),
           ),
-        ) ??
-        false;
-
-    if (!confirmDelete) return;
+        ],
+      ),
+    );
+    if (confirm != true) return;
 
     try {
-      // list_items + shared_lists, ON DELETE CASCADE ile bağlı: tek silme yeter.
       await _listRepo.deleteList(widget.listData['id'] as String);
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Liste silindi.')),
-        );
+        _snack('Liste silindi.');
         Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('Liste silinirken hata: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Liste silinirken bir hata oluştu.')),
-        );
-      }
-    }
-  }
-
-  Future<void> _showSaveChangesDialog() async {
-    // Only show save dialog for lists owned by the current user
-    final isOwner = widget.listData['user_id'] == currentUserId;
-
-    if (!_isChanged || !isOwner) {
-      if (!isOwner && _isChanged) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paylaşılan listelerde ürün tamamlanma durumu otomatik kaydedilir. Diğer değişiklikler kaydedilemez.')),
-        );
-      } else if (!isOwner && !_isChanged) {
-        // Nothing changed and not owner, no need to show notification.
-      } else { // Owner and changed but not saved
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kaydedilecek bir değişiklik bulunmuyor.')),
-        );
-      }
-      return;
-    }
-
-    final shouldSave = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Değişiklikler Kaydedilsin mi?', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: const Text('Yaptığınız değişiklikleri kaydetmek ister misiniz?'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Hayır', style: TextStyle(color: Colors.grey))),
-              ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Evet')),
-            ],
-          ),
-        ) ??
-        false;
-    if (shouldSave) {
-      await _updateCompletionRate(); // Update completion rate
-      if (mounted) {
-        setState(() {
-          _isChanged = false; // Reset changed status
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Değişiklikler kaydedildi!')),
-        );
-      }
+      if (mounted) _snack('Liste silinirken bir hata oluştu.', error: true);
     }
   }
 
@@ -875,163 +609,115 @@ class _ListDetailPageState extends State<ListDetailPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isOwner = widget.listData['user_id'] == currentUserId;
     final rate = _completionRate();
     final done = _items.where((i) => i['is_completed'] == true).length;
-
     final visible = _visibleItems;
+    final categories = _items
+        .map((i) => i['category'] as String?)
+        .whereType<String>()
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList();
 
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          widget.listData['name'] ?? 'Liste',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
+        title: Text(widget.listData['name'] ?? 'Liste'),
         actions: [
-          if (isOwner)
+          if (_isOwner)
             IconButton(
               icon: const Icon(Icons.person_add_alt_1_outlined),
               tooltip: 'Paylaş',
               onPressed: _showShareDialog,
             ),
-          if (isOwner)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Listeyi Sil',
-              onPressed: _deleteList,
-            ),
-          if (isOwner || _isChanged)
-            IconButton(
-              icon: Icon(_isChanged ? Icons.save : Icons.save_alt_outlined),
-              tooltip: 'Kaydet',
-              onPressed: _showSaveChangesDialog,
-            ),
-        ],
-      ),
-      floatingActionButton: isOwner
-          ? FloatingActionButton.extended(
-              heroTag: 'listDetailAddFab',
-              onPressed: _addNewItemDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Ürün ekle'),
-            )
-          : null,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-        children: [
-          _progressCard(scheme, rate, done),
-          if (_sharedEmails.isNotEmpty || !isOwner) ...[
-            const SizedBox(height: 12),
-            _sharedCard(scheme),
-          ],
-          const SizedBox(height: 16),
-          _filterBar(scheme),
-          const SizedBox(height: 12),
-          if (visible.isEmpty)
-            _emptyItems(scheme)
-          else
-            ...visible.map((item) => _itemTile(scheme, item, isOwner)),
-        ],
-      ),
-    );
-  }
-
-  Widget _progressCard(ColorScheme scheme, double rate, int done) {
-    final pct = (rate * 100).round();
-    String created = '';
-    try {
-      created = DateFormat('dd MMMM yyyy', 'tr_TR')
-          .format(DateTime.parse(widget.listData['created_at']));
-    } catch (_) {}
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            scheme.primary,
-            Color.lerp(scheme.primary, Colors.black, 0.3)!
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('%$pct',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('$done / ${_items.length} ürün alındı',
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 13)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: rate,
-              minHeight: 8,
-              backgroundColor: Colors.white.withValues(alpha: 0.25),
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-          ),
-          if (created.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.calendar_today,
-                    size: 13, color: Colors.white.withValues(alpha: 0.85)),
-                const SizedBox(width: 6),
-                Text(created,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 12)),
+          if (_isOwner)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              onSelected: (v) {
+                if (v == 'delete') _deleteList();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Listeyi Sil'),
+                ),
               ],
             ),
-          ],
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'listDetailAddFab',
+        onPressed: () => _itemSheet(),
+        icon: const Icon(Icons.add),
+        label: const Text('Ürün Ekle'),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$done / ${_items.length} ürün',
+                          style: TextStyle(
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: rate,
+                          minHeight: 7,
+                          backgroundColor: scheme.primary.withValues(alpha: .12),
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                PercentRing(value: rate),
+              ],
+            ),
+          ),
+          if (_sharedEmails.isNotEmpty || !_isOwner)
+            _sharedStrip(scheme),
+          const SizedBox(height: 8),
+          _filterRow(scheme, categories),
+          Expanded(
+            child: visible.isEmpty
+                ? _emptyItems(scheme)
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 100),
+                    children: _groupedItemWidgets(scheme, visible),
+                  ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _sharedCard(ColorScheme scheme) {
+  Widget _sharedStrip(ColorScheme scheme) {
     final people = <String>[
       if (listOwnerEmail.isNotEmpty && listOwnerEmail != 'Bilinmiyor')
         listOwnerEmail,
       ..._sharedEmails,
     ];
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Row(
         children: [
-          Icon(Icons.group_outlined, size: 18, color: scheme.primary),
-          const SizedBox(width: 10),
+          Icon(Icons.group_outlined, size: 16, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              people.isEmpty
-                  ? 'Bu liste kimseyle paylaşılmadı.'
-                  : people.join(', '),
-              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-              maxLines: 2,
+              people.isEmpty ? 'Bu liste paylaşılmadı.' : people.join(', '),
+              style:
+                  TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1040,187 +726,204 @@ class _ListDetailPageState extends State<ListDetailPage> {
     );
   }
 
-  Widget _filterBar(ColorScheme scheme) {
-    final markets =
-        _availableMarkets.where((m) => m != 'Tümü').toList();
-    final categories = _items
-        .map((i) => i['category'] as String?)
-        .whereType<String>()
-        .where((c) => c.isNotEmpty)
-        .toSet()
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Ürünler (${_items.length})',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: scheme.onSurface)),
-            Row(
+  Widget _filterRow(ColorScheme scheme, List<String> categories) {
+    return SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          Expanded(
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
-                Text('Tamamlananları gizle',
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant)),
-                Switch(
-                  value: _hideCompleted,
-                  onChanged: (v) => setState(() => _hideCompleted = v),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: const Text('Tümü'),
+                    selected: _selectedCategoryFilter == null,
+                    onSelected: (_) =>
+                        setState(() => _selectedCategoryFilter = null),
+                  ),
                 ),
-              ],
-            ),
-          ],
-        ),
-        if (markets.isNotEmpty || categories.isNotEmpty)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
                 for (final c in categories)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
+                    child: ChoiceChip(
                       label: Text(c),
                       selected: _selectedCategoryFilter == c,
-                      onSelected: (s) => setState(() =>
-                          _selectedCategoryFilter = s ? c : null),
-                    ),
-                  ),
-                for (final m in markets)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      avatar: const Icon(Icons.storefront, size: 16),
-                      label: Text(m),
-                      selected: _selectedMarketFilter == m,
                       onSelected: (s) => setState(
-                          () => _selectedMarketFilter = s ? m : null),
+                          () => _selectedCategoryFilter = s ? c : null),
                     ),
                   ),
               ],
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _emptyItems(ColorScheme scheme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.shopping_cart_outlined,
-              size: 44, color: scheme.primary),
-          const SizedBox(height: 10),
-          Text(
-            _items.isEmpty
-                ? 'Bu listede henüz ürün yok.'
-                : 'Filtreye uyan ürün yok.',
-            style: TextStyle(color: scheme.onSurfaceVariant),
+          IconButton(
+            tooltip: _hideCompleted
+                ? 'Tamamlananları göster'
+                : 'Tamamlananları gizle',
+            icon: Icon(
+              _hideCompleted ? Icons.filter_list_off : Icons.filter_list,
+              color: _hideCompleted ? scheme.primary : scheme.onSurfaceVariant,
+            ),
+            onPressed: () =>
+                setState(() => _hideCompleted = !_hideCompleted),
           ),
+          const SizedBox(width: 8),
         ],
       ),
     );
   }
 
-  Widget _itemTile(
-      ColorScheme scheme, Map<String, dynamic> item, bool isOwner) {
-    final realIndex = _items.indexOf(item);
+  List<Widget> _groupedItemWidgets(
+      ColorScheme scheme, List<Map<String, dynamic>> visible) {
+    // Kategoriye göre grupla; kategorisizler "Diğer" altında.
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final item in visible) {
+      final cat = (item['category'] as String?)?.trim();
+      final key = (cat == null || cat.isEmpty) ? 'Diğer' : cat;
+      groups.putIfAbsent(key, () => []).add(item);
+    }
+
+    final widgets = <Widget>[];
+    groups.forEach((cat, items) {
+      widgets.add(Padding(
+        padding: const EdgeInsets.fromLTRB(2, 10, 0, 8),
+        child: Text(cat,
+            style: TextStyle(
+                fontWeight: FontWeight.w800, color: scheme.onSurface)),
+      ));
+      for (final item in items) {
+        widgets.add(_itemTile(scheme, item));
+      }
+    });
+    return widgets;
+  }
+
+  Widget _itemTile(ColorScheme scheme, Map<String, dynamic> item) {
     final completed = item['is_completed'] == true;
-    final quantity = item['quantity'] ?? 1;
+    final qty = item['quantity'] ?? 1;
     final market = item['market'] as String?;
     final category = item['category'] as String?;
-    final tags = (item['tags'] as List?)?.cast<String>() ?? const [];
-
     final meta = [
-      'x$quantity',
-      if (category != null && category.isNotEmpty) category,
+      if (qty != 1) 'x$qty',
       if (market != null && market.isNotEmpty) market,
     ].join(' • ');
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 5),
+    final tile = Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: ListTile(
+        onTap: _isOwner ? () => _itemSheet(existing: item) : null,
+        contentPadding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
+        leading: ProductThumb(
+          imageUrl: item['image_url'] as String?,
+          emoji: category != null && category.isNotEmpty
+              ? categoryEmoji(category)
+              : null,
+          size: 44,
+        ),
+        title: Text(
+          item['product_name'] ?? '',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            decoration: completed ? TextDecoration.lineThrough : null,
+            color:
+                completed ? scheme.onSurfaceVariant : scheme.onSurface,
+          ),
+        ),
+        subtitle: meta.isEmpty
+            ? null
+            : Text(meta,
+                style: TextStyle(
+                    fontSize: 11.5, color: scheme.onSurfaceVariant)),
+        trailing: Checkbox(
+          value: completed,
+          activeColor: scheme.primary,
+          onChanged: (_) => _toggleItemComplete(item),
+        ),
+      ),
+    );
+
+    if (!_isOwner) return tile;
+    return Dismissible(
+      key: ValueKey(item['id']),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24, bottom: 8),
+        decoration: BoxDecoration(
+          color: scheme.error.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Icon(Icons.delete_outline, color: scheme.error),
+      ),
+      confirmDismiss: (_) async {
+        await _deleteItem(item);
+        return false; // listeyi _fetchItems tazeliyor
+      },
+      child: tile,
+    );
+  }
+
+  Widget _emptyItems(ColorScheme scheme) {
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Checkbox(
-              value: completed,
-              onChanged: (isOwner || !completed)
-                  ? (_) => _toggleItemComplete(realIndex)
-                  : null,
+            Icon(Icons.shopping_cart_outlined,
+                size: 46, color: scheme.onSurfaceVariant),
+            const SizedBox(height: 10),
+            Text(
+              _items.isEmpty
+                  ? 'Bu listede henüz ürün yok.'
+                  : 'Filtreye uyan ürün yok.',
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item['product_name'] ?? '',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      decoration:
-                          completed ? TextDecoration.lineThrough : null,
-                      color: completed
-                          ? scheme.onSurfaceVariant
-                          : scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(meta,
-                      style: TextStyle(
-                          fontSize: 12, color: scheme.onSurfaceVariant)),
-                  if (tags.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: tags
-                            .map((t) => Chip(
-                                  label: Text(t,
-                                      style: const TextStyle(fontSize: 10)),
-                                  visualDensity: VisualDensity.compact,
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  padding: EdgeInsets.zero,
-                                ))
-                            .toList(),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (isOwner) ...[
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: Icon(Icons.edit_outlined,
-                    size: 20, color: scheme.onSurfaceVariant),
-                tooltip: 'Düzenle',
-                onPressed: () => _editItemDialog(realIndex),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: Icon(Icons.delete_outline,
-                    size: 20, color: scheme.error),
-                tooltip: 'Sil',
-                onPressed: () => _deleteItem(realIndex),
-              ),
-            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// − sayı + adet seçici (create_list ile aynı görünüm).
+class _QtyStepper extends StatelessWidget {
+  const _QtyStepper({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: Icon(Icons.remove, color: scheme.onSurfaceVariant),
+          onPressed: value > 1 ? () => onChanged(value - 1) : null,
+        ),
+        SizedBox(
+          width: 24,
+          child: Text('$value',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: Icon(Icons.add, color: scheme.primary),
+          onPressed: () => onChanged(value + 1),
+        ),
+      ],
     );
   }
 }
