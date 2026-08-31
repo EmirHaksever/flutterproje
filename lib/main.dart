@@ -10,7 +10,6 @@ import 'screens/profile.dart';
 import 'screens/settings.dart';
 import 'screens/main_navigation.dart';
 import 'screens/ai_chat.dart';
-import 'screens/history.dart';
 
 
 // Helper function to create a MaterialColor from a single Color
@@ -162,14 +161,6 @@ class _MyAppState extends State<MyApp> {
             );
           case '/aiChat':
             return MaterialPageRoute(builder: (context) => const AIChatPage());
-          // case '/stats': // Bu rota kaldırıldı. StatsPage artık sadece MainNavigationPage içinde gösterilir.
-          //   return MaterialPageRoute(
-          //     builder: (context) => StatsPage(
-          //       customPrimarySwatch: customPrimaryColor,
-          //     ),
-          //   );
-          case '/history':
-            return MaterialPageRoute(builder: (context) => const HistoryPage());
 
           default:
             return MaterialPageRoute(builder: (context) => const LoginScreen());

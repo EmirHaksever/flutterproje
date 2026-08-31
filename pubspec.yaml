@@ -11,23 +11,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   supabase_flutter: ^2.8.4
   cupertino_icons: ^1.0.8
-  lucide_icons_flutter: ^2.0.2
   intl: ^0.20.2
   shared_preferences: ^2.5.3
   fl_chart: ^0.70.2
-  flutter_localizations:
-    sdk: flutter
   flutter_dotenv: ^5.0.2
   http: ^1.4.0
-  google_generative_ai: ^0.2.2 # <-- Bunu ekle
   dropdown_button2: ^2.3.9
-
-  
-
-  
-  
 
 dev_dependencies:
   flutter_test:
