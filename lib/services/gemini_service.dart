@@ -6,7 +6,16 @@ class GeminiService {
   // API anahtarı .env dosyasından okunur (koda gömülmez). main() içinde
   // dotenv.load() çağrıldığı için burada hazır olur.
   final String apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-  final String apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+  // Model adı .env'den değiştirilebilir (GEMINI_MODEL). Google modelleri zaman
+  // zaman emekliye ayırdığı için sabit yazmıyoruz; varsayılan "her zaman güncel
+  // flash" takma adı.
+  static final String _model =
+      dotenv.env['GEMINI_MODEL']?.trim().isNotEmpty == true
+          ? dotenv.env['GEMINI_MODEL']!.trim()
+          : 'gemini-flash-latest';
+  final String apiUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent';
 
   /// Sends a prompt to the Gemini API and includes previous chat history for context.
   ///
@@ -47,19 +56,27 @@ class GeminiService {
 
     final uri = Uri.parse('$apiUrl?key=$apiKey');
 
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        "contents": contents, // Use the dynamically built contents list
-        "generationConfig": {
-          "temperature": 0.7, // Adjust for creativity (0.0 - 1.0)
-          "topP": 0.95,
-          "topK": 40,
-          "maxOutputTokens": 1024,
-        },
-      }),
-    );
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              "contents": contents,
+              "generationConfig": {
+                "temperature": 0.7,
+                "topP": 0.95,
+                "topK": 40,
+                "maxOutputTokens": 1024,
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+    } on Exception {
+      throw Exception(
+          'Yapay zekâ servisine ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.');
+    }
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
