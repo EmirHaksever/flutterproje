@@ -290,9 +290,14 @@ class _EmptyHint extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: Colors.grey[400]),
+          Icon(icon,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(height: 12),
-          Text(text, style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+          Text(text,
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 16)),
         ],
       ),
     );

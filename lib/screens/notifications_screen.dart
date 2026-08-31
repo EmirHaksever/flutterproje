@@ -69,7 +69,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final scheme = Theme.of(context).colorScheme;
+    final primary = scheme.primary;
     final hasUnread = _items.any((n) => !n.isRead);
     return Scaffold(
       appBar: AppBar(
@@ -93,11 +94,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.notifications_none,
-                          size: 64, color: Colors.grey[400]),
+                          size: 64, color: scheme.onSurfaceVariant),
                       const SizedBox(height: 12),
                       Text('Bildirim yok.',
                           style: TextStyle(
-                              color: Colors.grey[600], fontSize: 16)),
+                              color: scheme.onSurfaceVariant, fontSize: 16)),
                     ],
                   ),
                 )

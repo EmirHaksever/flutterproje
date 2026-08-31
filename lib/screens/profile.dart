@@ -134,17 +134,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final scheme = Theme.of(context).colorScheme;
+    final primaryColor = scheme.primary;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Açık gri arka plan
       appBar: AppBar(
-        title: const Text(
-          'Profilim',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: primaryColor,
-        elevation: 0,
+        title: const Text('Profilim',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: _isLoading
@@ -178,7 +174,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey.shade800,
+                            color: scheme.onSurface,
                           ),
                         ),
                       ),
@@ -192,7 +188,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   Text(
                     _userEmail ?? 'Misafir Kullanıcı',
-                    style: TextStyle(fontSize: 15, color: Colors.grey.shade600),
+                    style: TextStyle(
+                        fontSize: 15, color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 30),
 
@@ -227,12 +224,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: const Icon(Icons.logout),
                     label: const Text('Çıkış Yap'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      foregroundColor: Colors.white,
+                      backgroundColor: scheme.errorContainer,
+                      foregroundColor: scheme.onErrorContainer,
                       minimumSize: const Size.fromHeight(50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      elevation: 5,
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -262,14 +258,15 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(width: 20),
               Text(
                 title,
-                style: TextStyle(
-                  fontSize: 18,
+                style: const TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade800,
                 ),
               ),
               const Spacer(),
-              Icon(Icons.arrow_forward_ios, size: 20, color: Colors.grey.shade400),
+              Icon(Icons.chevron_right,
+                  size: 22,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ],
           ),
         ),

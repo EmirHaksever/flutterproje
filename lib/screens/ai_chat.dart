@@ -30,6 +30,10 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
   late AnimationController _animationController;
   late Animation<double> _sendButtonScaleAnimation;
 
+  /// AI özelliğinin kendine has vurgu rengi (uygulamanın turkuazından ayrı,
+  /// bilinçli bir tercih). Hem açık hem koyu modda okunur.
+  static const Color _aiAccent = Color(0xFF7E57C2);
+
   @override
   void initState() {
     super.initState();
@@ -279,28 +283,23 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
 
   Widget buildMessage(Map<String, String> message) {
     final isUser = message['role'] == 'user';
+    final scheme = Theme.of(context).colorScheme;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+        constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.78),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xFF6A1B9A).withValues(alpha: 0.9) : const Color(0xFFE8EAF6), // Mor tonları / Açık gri-mavi
-          borderRadius: BorderRadius.circular(20), // Daha yuvarlak baloncuklar
-          boxShadow: [
-            BoxShadow(
-              color: (isUser ? const Color(0xFF6A1B9A) : Colors.grey).withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: isUser ? _aiAccent : scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Text(
           message['text'] ?? '',
           style: TextStyle(
-            color: isUser ? Colors.white : Colors.blueGrey.shade800, // Daha belirgin metin rengi
-            fontSize: 16, // Font boyutu artırıldı
+            color: isUser ? Colors.white : scheme.onSurface,
+            fontSize: 15,
           ),
         ),
       ),
@@ -308,26 +307,29 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
   }
 
   Widget buildSuggestedPromptButtons() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
-      color: Colors.white,
+      color: scheme.surface,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: suggestedPrompts.entries.map((entry) {
             return Padding(
-              padding: const EdgeInsets.only(right: 12.0),
+              padding: const EdgeInsets.only(right: 10.0),
               child: ActionChip(
-                avatar: Icon(entry.value['icon'] as IconData, color: const Color(0xFF6A1B9A), size: 22), // Mor ikon
+                avatar: Icon(entry.value['icon'] as IconData,
+                    color: _aiAccent, size: 20),
                 label: Text(entry.key),
-                onPressed: isLoading ? null : () => handlePrompt(entry.value['value'] as String),
-                backgroundColor: Colors.white,
-                side: BorderSide(color: const Color(0xFF6A1B9A).withValues(alpha: 0.4), width: 1.0), // Mor kenarlık
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                labelStyle: const TextStyle(color: Color(0xFF6A1B9A), fontWeight: FontWeight.w600, fontSize: 14),
-                elevation: 4,
-                shadowColor: Colors.black.withValues(alpha: 0.15),
+                onPressed: isLoading
+                    ? null
+                    : () => handlePrompt(entry.value['value'] as String),
+                side: BorderSide(color: _aiAccent.withValues(alpha: 0.4)),
+                labelStyle: const TextStyle(
+                    color: _aiAccent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13),
               ),
             );
           }).toList(),
@@ -338,23 +340,24 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF8E24AA), Color(0xFF4A148C)], // Mor tonları
+              colors: [Color(0xFF8E24AA), Color(0xFF4A148C)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
         ),
-        title: const Text('AI Asistanı', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)), // Daha büyük başlık
+        title: const Text('AI Asistanı',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
-        centerTitle: true, // Başlık ortalandı
+        centerTitle: true,
       ),
-      backgroundColor: const Color(0xFFF0F2F5), // Daha açık, yumuşak gri arka plan
       body: SafeArea(
         child: Column(
           children: [
@@ -374,15 +377,15 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: LinearProgressIndicator(
-                  backgroundColor: const Color(0xFFE8EAF6), // Açık gri-mavi
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6A1B9A)), // Mor tonu
+                  backgroundColor: scheme.surfaceContainerHighest,
+                  valueColor: const AlwaysStoppedAnimation<Color>(_aiAccent),
                   borderRadius: BorderRadius.circular(10),
-                  minHeight: 8,
+                  minHeight: 6,
                 ),
               ),
             // Metin Giriş Alanı ve Gönderme Butonu
             Container(
-              color: Colors.white,
+              color: scheme.surface,
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
@@ -391,28 +394,28 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
                       controller: _controller,
                       decoration: InputDecoration(
                         hintText: 'Mesajınızı yazın...',
-                        hintStyle: TextStyle(color: Colors.grey.shade600),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30.0), // Daha da yuvarlak
+                          borderRadius: BorderRadius.circular(28.0),
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFF0F2F5), // Arka plan rengiyle uyumlu
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 14.0), // Padding artırıldı
+                        fillColor: scheme.surfaceContainerHighest,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20.0, vertical: 12.0),
                       ),
                       onSubmitted: (value) => sendMessage(_controller.text),
                     ),
                   ),
-                  const SizedBox(width: 10), // Daha fazla boşluk
+                  const SizedBox(width: 10),
                   ScaleTransition(
                     scale: _sendButtonScaleAnimation,
                     child: FloatingActionButton(
                       heroTag: 'aiChatSendFab',
                       onPressed: isLoading ? null : () => sendMessage(_controller.text),
-                      mini: false, // Daha büyük bir FAB
-                      backgroundColor: const Color(0xFF8E24AA), // Mor tonu
-                      elevation: 5, // Daha belirgin gölge
-                      shape: const CircleBorder(), // Tamamen dairesel buton
+                      backgroundColor: _aiAccent,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: const CircleBorder(),
                       child: isLoading
                           ? const SizedBox(
                               width: 24, // Boyut ayarlandı

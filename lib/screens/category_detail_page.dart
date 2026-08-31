@@ -100,11 +100,8 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
     final Color primaryColor = widget.customPrimarySwatch;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Arka plan rengi eklendi
       appBar: AppBar(
         title: Text('${widget.categoryName} Detayları'),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -133,8 +130,9 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
                       const SizedBox(height: 16),
                       LinearProgressIndicator(
                         value: completionRate,
-                        backgroundColor: Colors.grey[300],
-                        color: primaryColor, // Tema rengine uygun ton
+                        backgroundColor:
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: primaryColor,
                         minHeight: 10,
                         borderRadius: BorderRadius.circular(5),
                       ),
@@ -144,7 +142,13 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
                 const Divider(),
                 Expanded(
                   child: _categoryItems.isEmpty
-                      ? Center(child: Text('${widget.categoryName} kategorisinde hiç ürün bulunamadı.', style: const TextStyle(color: Colors.grey)))
+                      ? Center(
+                          child: Text(
+                              '${widget.categoryName} kategorisinde hiç ürün yok.',
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant)))
                       : ListView.builder(
                           itemCount: _categoryItems.length,
                           itemBuilder: (context, index) {
@@ -164,15 +168,26 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
                                 title: Text(
                                   productName,
                                   style: TextStyle(
-                                    decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
-                                    color: isCompleted ? Colors.grey : Colors.black,
+                                    decoration: isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : TextDecoration.none,
+                                    color: isCompleted
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                // BURADA LİSTE ADI GÖSTERİLİYOR
                                 subtitle: Text(
-                                  'Liste: $listName', // Listenin ID'si yerine adı gözükecek
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  'Liste: $listName',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
                                 ),
                                 value: isCompleted,
                                 onChanged: (bool? newValue) {

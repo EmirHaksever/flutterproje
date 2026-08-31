@@ -19,8 +19,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String _language = 'tr'; // Varsayılan dil Türkçe
   bool _rememberMe = false; // Yeni: Beni Hatırla durumu
 
-  // Yeni eklenen vurgu rengi
-  final Color _loginAccentColor = const Color(0xFF4DB6AC); // Material Teal 300
+  // Vurgu rengi artık temadan geliyor (koyu modda da doğru).
+  Color get _loginAccentColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
@@ -207,11 +207,12 @@ class _LoginScreenState extends State<LoginScreen> {
     return _language == 'tr' ? 'Bir hata oluştu: $message' : 'Error: $message';
   }
 
-  // Degrade renkler güncellendi: Çok açık ve ferah yeşil-mavi tonları
+  // Arka plan degradesi — tema ana renginin çok hafif tonları (koyu mod uyumlu).
   List<Color> _getBackgroundGradientColors() {
+    final scheme = Theme.of(context).colorScheme;
     return [
-      const Color(0xFFF0FFF0), // Honeydew (Çok açık yeşil, beyaza yakın)
-      const Color(0xFFE0FFFF), // Light Cyan (Açık cam göbeği/turkuaz, beyaza yakın)
+      scheme.surface,
+      Color.lerp(scheme.surface, scheme.primary, 0.12)!,
     ];
   }
 
@@ -257,9 +258,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? (isTurkish ? 'Giriş Yap' : 'Login')
                             : (isTurkish ? 'Kayıt Ol' : 'Register'),
                         style: TextStyle(
-                            fontSize: 32,
+                            fontSize: 30,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey.shade800),
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                       const SizedBox(height: 30),
 
@@ -270,17 +271,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: InputDecoration(
                           labelText: isTurkish ? 'E-posta' : 'Email',
                           hintText: 'ornek@email.com',
-                          prefixIcon: Icon(Icons.email_outlined, color: _loginAccentColor.withValues(alpha: 0.7)), // Vurgu rengi kullanıldı
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none, // Kenarlık çizgisi yok
-                          ),
-                          focusedBorder: OutlineInputBorder( // Odaklandığında kenarlık
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: _loginAccentColor, width: 2), // Vurgu rengi kullanıldı
-                          ),
+                          prefixIcon: Icon(Icons.email_outlined,
+                              color: _loginAccentColor),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -292,21 +284,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: InputDecoration(
                           labelText: isTurkish ? 'Şifre' : 'Password',
                           hintText: '••••••••',
-                          prefixIcon: Icon(Icons.lock_outline, color: _loginAccentColor.withValues(alpha: 0.7)), // Vurgu rengi kullanıldı
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder( // Odaklandığında kenarlık
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: _loginAccentColor, width: 2), // Vurgu rengi kullanıldı
-                          ),
+                          prefixIcon: Icon(Icons.lock_outline,
+                              color: _loginAccentColor),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                              color: Colors.grey.shade600,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                             onPressed: () {
                               setState(() {
@@ -325,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: CheckboxListTile(
                             title: Text(
                               isTurkish ? 'Beni Hatırla' : 'Remember Me',
-                              style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+                              style: const TextStyle(fontSize: 14),
                             ),
                             value: _rememberMe,
                             onChanged: (bool? newValue) async {
@@ -351,13 +334,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           : ElevatedButton(
                               onPressed: _authUser,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _loginAccentColor, // Vurgu rengi kullanıldı
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size.fromHeight(50), // Geniş buton
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15), // Yuvarlak köşeler
-                                ),
-                                elevation: 5, // Hafif gölge
+                                minimumSize: const Size.fromHeight(50),
                               ),
                               child: Text(
                                 _isLogin
@@ -399,21 +376,22 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
       appBar: AppBar(
-        backgroundColor: Colors.transparent, // Şeffaf AppBar
-        elevation: 0, // Gölge yok
+        backgroundColor: Colors.transparent,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        elevation: 0,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: DropdownButton<String>(
               value: _language,
               underline: const SizedBox(),
-              icon: Icon(Icons.language, color: Colors.grey.shade700), // İkon eklendi
+              icon: const Icon(Icons.language),
               onChanged: (value) {
                 setState(() => _language = value!);
               },
               items: const [
-                DropdownMenuItem(value: 'tr', child: Text('🇹🇷 TR', style: TextStyle(color: Colors.black87))),
-                DropdownMenuItem(value: 'en', child: Text('🇺🇸 EN', style: TextStyle(color: Colors.black87))),
+                DropdownMenuItem(value: 'tr', child: Text('🇹🇷 TR')),
+                DropdownMenuItem(value: 'en', child: Text('🇺🇸 EN')),
               ],
             ),
           ),
