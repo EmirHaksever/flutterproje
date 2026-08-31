@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
-// GeminiService'inizin bulunduğu yolu kontrol edin.
 import '../services/gemini_service.dart';
 
 class AIChatPage extends StatefulWidget {
@@ -32,7 +29,6 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
   final ScrollController _scrollController = ScrollController();
   late AnimationController _animationController;
   late Animation<double> _sendButtonScaleAnimation;
-  RealtimeChannel? _chatChannel; // Realtime dinleyici için kanal
 
   @override
   void initState() {
@@ -47,7 +43,9 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
     }
 
     loadChatHistory(); // Sohbet geçmişini yükle
-    _setupRealtimeListener(); // Realtime dinleyiciyi kur
+    // Not: Mesajlar zaten iyimser olarak ekrana ekleniyor ve DB'ye yazılıyor.
+    // Realtime dinleyici, kendi yazdığımız mesajı bir kez daha ekleyip çift
+    // baloncuğa yol açıyordu; tek kullanıcının kendi geçmişi olduğu için kaldırıldı.
 
     _animationController = AnimationController(
       vsync: this,
@@ -71,7 +69,6 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
     _controller.dispose();
     _scrollController.dispose();
     _animationController.dispose();
-    _chatChannel?.unsubscribe(); // Kanalı kapat
     super.dispose();
   }
 
@@ -121,40 +118,6 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
         });
       }
     }
-  }
-
-  // Gerçek zamanlı dinleyiciyi kur
-  void _setupRealtimeListener() {
-    if (_currentUserId == null) return;
-
-    _chatChannel = supabase
-        .channel('public:ai_chat_history_channel') // Benzersiz bir kanal adı
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert, // Sadece yeni eklenen mesajları dinle
-          schema: 'public',
-          table: 'ai_chat_history', // Tablo adı
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id', // Düzeltildi: Kullanıcı ID'si için 'user_id' sütunu kullanıldı
-            value: _currentUserId!,
-          ),
-          callback: (payload) {
-            debugPrint('Realtime: Yeni mesaj eklendi: ${payload.newRecord}');
-            if (mounted) {
-              setState(() {
-                // Sadece yeni gelen mesajı ekle, tüm geçmişi yeniden çekme
-                messages.add({
-                  'role': payload.newRecord['role'] as String,
-                  'text': payload.newRecord['message'] as String,
-                });
-              });
-              _scrollToBottom(); // Yeni mesaj geldiğinde en alta kaydır
-            }
-          },
-        )
-        .subscribe();
-
-    debugPrint('Realtime listener for ai_chat_history set up for user: $_currentUserId');
   }
 
   // Mesajı veritabanına kaydet
