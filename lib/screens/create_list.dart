@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../repositories/image_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ui_kit.dart';
 
 class CreateListPage extends StatefulWidget {
   final String? initialFilterCategory;
@@ -22,6 +27,8 @@ class CreateListPage extends StatefulWidget {
 class _CreateListPageState extends State<CreateListPage> {
   final TextEditingController _listNameController = TextEditingController();
   final supabase = Supabase.instance.client;
+  final ImagePicker _picker = ImagePicker();
+  final ImageRepository _imageRepo = ImageRepository();
 
   final List<Map<String, dynamic>> products = [];
   bool _saving = false;
@@ -78,7 +85,30 @@ class _CreateListPageState extends State<CreateListPage> {
         'quantity': 1,
         'features': <String>[],
         'is_completed': false,
+        'image_bytes': null,
+        'image_ext': 'jpg',
+        'image_url': null,
       };
+
+  Future<(Uint8List, String)?> _pickImage() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        imageQuality: 78,
+      );
+      if (picked == null) return null;
+      final bytes = await picked.readAsBytes();
+      final ext = picked.name.contains('.')
+          ? picked.name.split('.').last.toLowerCase()
+          : 'jpg';
+      return (bytes, ext);
+    } catch (e) {
+      debugPrint('Resim seçilemedi: $e');
+      if (mounted) _snack('Resim seçilemedi.');
+      return null;
+    }
+  }
 
   void _removeProduct(int index) {
     setState(() => products.removeAt(index));
@@ -95,6 +125,8 @@ class _CreateListPageState extends State<CreateListPage> {
     final nameCtrl = TextEditingController();
     String? category = _pendingCategory;
     int qty = 1;
+    Uint8List? photoBytes;
+    String photoExt = 'jpg';
 
     await showModalBottomSheet(
       context: context,
@@ -119,14 +151,47 @@ class _CreateListPageState extends State<CreateListPage> {
                         fontWeight: FontWeight.w800,
                         color: scheme.onSurface)),
                 const SizedBox(height: 14),
-                TextField(
-                  controller: nameCtrl,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Ürün adı (örn: Süt 1 L)',
-                    prefixIcon: Icon(Icons.shopping_basket_outlined),
-                  ),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await _pickImage();
+                        if (picked != null) {
+                          setSheet(() {
+                            photoBytes = picked.$1;
+                            photoExt = picked.$2;
+                          });
+                        }
+                      },
+                      child: photoBytes == null
+                          ? Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: AppTheme.heroGreenBg,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.add_a_photo_outlined,
+                                  color: scheme.primary),
+                            )
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.memory(photoBytes!,
+                                  width: 56, height: 56, fit: BoxFit.cover),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: nameCtrl,
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          hintText: 'Ürün adı (örn: Süt 1 L)',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 if (widget.availableCategories.isNotEmpty) ...[
                   const SizedBox(height: 14),
@@ -176,6 +241,8 @@ class _CreateListPageState extends State<CreateListPage> {
                       setState(() {
                         final p = _newProduct(name, category);
                         p['quantity'] = qty;
+                        p['image_bytes'] = photoBytes;
+                        p['image_ext'] = photoExt;
                         products.add(p);
                       });
                       Navigator.pop(ctx);
@@ -206,6 +273,20 @@ class _CreateListPageState extends State<CreateListPage> {
 
     setState(() => _saving = true);
     try {
+      // Önce eklenen fotoğrafları yükle (biri patlarsa o ürün resimsiz gider).
+      for (final p in products) {
+        final bytes = p['image_bytes'] as Uint8List?;
+        if (bytes == null || p['image_url'] != null) continue;
+        try {
+          p['image_url'] = await _imageRepo.uploadProductImage(
+            bytes,
+            extension: (p['image_ext'] as String?) ?? 'jpg',
+          );
+        } catch (e) {
+          debugPrint('Ürün resmi yüklenemedi: $e');
+        }
+      }
+
       final userId = supabase.auth.currentUser!.id;
       final newList = await supabase
           .from('shopping_lists')
@@ -221,6 +302,7 @@ class _CreateListPageState extends State<CreateListPage> {
                 'market': p['market'],
                 'quantity': p['quantity'],
                 'features': p['features'],
+                'image_url': p['image_url'],
                 'is_completed': false,
                 'list_id': listId,
               })
@@ -363,6 +445,7 @@ class _CreateListPageState extends State<CreateListPage> {
   Widget _productRow(ColorScheme scheme, int i) {
     final p = products[i];
     final category = p['category'] as String?;
+    final bytes = p['image_bytes'] as Uint8List?;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
@@ -373,12 +456,19 @@ class _CreateListPageState extends State<CreateListPage> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 15,
-            backgroundColor: AppTheme.heroGreenBg,
-            child: Icon(Icons.shopping_basket_outlined,
-                size: 16, color: scheme.primary),
-          ),
+          if (bytes != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.memory(bytes, width: 38, height: 38, fit: BoxFit.cover),
+            )
+          else
+            ProductThumb(
+              emoji: category != null && category.isNotEmpty
+                  ? categoryEmoji(category)
+                  : null,
+              size: 38,
+              radius: 10,
+            ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

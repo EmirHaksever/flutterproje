@@ -301,6 +301,55 @@ class CategoryCard extends StatelessWidget {
   }
 }
 
+/// Ürün küçük görseli: `imageUrl` varsa fotoğraf, yoksa yeşil kutuda emoji.
+class ProductThumb extends StatelessWidget {
+  const ProductThumb({
+    super.key,
+    this.imageUrl,
+    this.emoji,
+    this.size = 44,
+    this.radius = 12,
+  });
+
+  final String? imageUrl;
+  final String? emoji;
+  final double size;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fallback = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppTheme.heroGreenBg,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: (emoji != null && emoji!.isNotEmpty)
+          ? Text(emoji!, style: TextStyle(fontSize: size * 0.5))
+          : Icon(Icons.shopping_basket_outlined,
+              size: size * 0.5, color: scheme.primary),
+    );
+
+    if (imageUrl == null || imageUrl!.isEmpty) return fallback;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Image.network(
+        imageUrl!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : fallback,
+      ),
+    );
+  }
+}
+
 /// Kategori adına göre emoji tahmini (tasarım taslağındaki gibi).
 ///
 /// Naif `contains` yerine kelime bazlı eşleşme — yoksa "markET" içindeki

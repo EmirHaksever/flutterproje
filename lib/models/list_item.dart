@@ -8,6 +8,7 @@ class ListItem {
   final bool isCompleted;
   final DateTime createdAt;
   final String? market;
+  final String? imageUrl;
   final List<String> tags;
   final List<String> features;
 
@@ -20,6 +21,7 @@ class ListItem {
     this.isCompleted = false,
     required this.createdAt,
     this.market,
+    this.imageUrl,
     this.tags = const [],
     this.features = const [],
   });
@@ -35,6 +37,7 @@ class ListItem {
       createdAt:
           DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
       market: map['market'] as String?,
+      imageUrl: map['image_url'] as String?,
       tags: _toStringList(map['tags']),
       features: _toStringList(map['features']),
     );
@@ -48,6 +51,7 @@ class ListItem {
         'quantity': quantity,
         'is_completed': isCompleted,
         'market': market,
+        'image_url': imageUrl,
         'tags': tags,
         'features': features,
       };
@@ -58,6 +62,7 @@ class ListItem {
     int? quantity,
     bool? isCompleted,
     String? market,
+    String? imageUrl,
     List<String>? tags,
     List<String>? features,
   }) {
@@ -70,6 +75,7 @@ class ListItem {
       isCompleted: isCompleted ?? this.isCompleted,
       createdAt: createdAt,
       market: market ?? this.market,
+      imageUrl: imageUrl ?? this.imageUrl,
       tags: tags ?? this.tags,
       features: features ?? this.features,
     );

@@ -129,6 +129,7 @@ class ListRepository {
     int? quantity,
     String? category,
     String? market,
+    String? imageUrl,
     List<String>? tags,
   }) async {
     final patch = <String, dynamic>{};
@@ -136,6 +137,7 @@ class ListRepository {
     if (quantity != null) patch['quantity'] = quantity;
     if (category != null) patch['category'] = category;
     if (market != null) patch['market'] = market;
+    if (imageUrl != null) patch['image_url'] = imageUrl;
     if (tags != null) patch['tags'] = tags;
     if (patch.isEmpty) return;
     await _client.from('list_items').update(patch).eq('id', itemId);
