@@ -26,7 +26,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _loadRememberMePreference(); // Beni Hatırla tercihini yükle
-    _checkAutoLogin(); // Uygulama başladığında otomatik girişi kontrol et
+    // Navigasyon initState içinde doğrudan çağrılamaz; ilk kareden sonra çalıştır.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAutoLogin());
   }
 
   @override
@@ -36,79 +37,30 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // Yeni: Beni Hatırla tercihini SharedPreferences'tan yükle
+  // "Beni Hatırla" tercihini ve (yalnızca) e-postayı yükle.
+  // Şifre HİÇBİR ZAMAN saklanmaz — Supabase oturumu zaten güvenli tutuluyor.
   Future<void> _loadRememberMePreference() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Eski sürümlerden kalmış olabilecek düz-metin şifreyi temizle (tek seferlik göç).
+    await prefs.remove('password');
+
+    if (!mounted) return;
     setState(() {
       _rememberMe = prefs.getBool('rememberMe') ?? false;
-      // Eğer "beni hatırla" aktifse, kayıtlı e-posta ve şifreyi otomatik doldur
       if (_rememberMe) {
         _emailController.text = prefs.getString('email') ?? '';
-        _passwordController.text = prefs.getString('password') ?? '';
       }
     });
   }
 
-  void _checkAutoLogin() async {
-    // 1. Önce Supabase'in aktif bir oturumu olup olmadığını kontrol et
+  // Otomatik giriş yalnızca geçerli bir Supabase oturumu varsa yapılır.
+  // Supabase SDK oturumu güvenli depoda tutar ve access token'ı otomatik yeniler.
+  void _checkAutoLogin() {
     final session = Supabase.instance.client.auth.currentSession;
-    if (session != null) { // mounted kontrolü aşağıya alındı
-      debugPrint('Supabase aktif oturum tespit edildi, ana sayfaya yönlendiriliyor.');
-      if (mounted) { // Widget hala aktif mi kontrol et
-        // Oturum varsa, SharedPreferences'taki "beni hatırla" ayarını güncelleyelim.
-        // Bu, bir hata durumunda bile uygulamanın tutarlı kalmasını sağlar.
-        final prefs = await SharedPreferences.getInstance();
-        if (prefs.getBool('rememberMe') == true) {
-           await prefs.setString('email', session.user!.email ?? '');
-           await prefs.setString('password', _passwordController.text); // Şifreye erişemeyiz, sadece kontrol
-        } else {
-           await prefs.remove('email');
-           await prefs.remove('password');
-           await prefs.setBool('rememberMe', false);
-        }
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-      return; // Zaten oturum açık, daha fazla işlem yapmaya gerek yok
-    }
-
-    // 2. Aktif bir Supabase oturumu yoksa, SharedPreferences'ta kaydedilmiş kimlik bilgilerini ve _rememberMe tercihini kontrol et
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('email');
-    final password = prefs.getString('password');
-    final rememberMePref = prefs.getBool('rememberMe') ?? false; // Beni Hatırla tercihi
-
-    // Sadece "Beni Hatırla" seçeneği aktifse ve bilgiler varsa otomatik giriş yap
-    if (email != null && password != null && rememberMePref) {
-      debugPrint('SharedPreferences\'ta kayıtlı kimlik bilgileri bulundu ve Beni Hatırla aktif, giriş yapılıyor...');
-      try {
-        final response = await Supabase.instance.client.auth.signInWithPassword(
-          email: email,
-          password: password,
-        );
-
-        if (response.session != null && mounted) {
-          debugPrint('Otomatik giriş başarılı!');
-          if (mounted) { // Widget hala aktif mi kontrol et
-            Navigator.pushReplacementNamed(context, '/home');
-          }
-        }
-      } on AuthException catch (e) {
-        debugPrint('Otomatik giriş başarısız (AuthException): ${e.message}');
-        // Hata oluştuysa, kullanıcı giriş ekranında kalır ve manuel giriş yapması gerekir.
-        // Kayıtlı bilgileri temizle ki bir sonraki açılışta tekrar denemesin
-        await prefs.remove('email');
-        await prefs.remove('password');
-        await prefs.setBool('rememberMe', false); // Beni Hatırla'yı da kapat
-      } catch (e) {
-        debugPrint('Otomatik giriş başarısız (Genel Hata): $e');
-        // Diğer genel hatalarda da kullanıcı giriş ekranında kalır.
-        await prefs.remove('email');
-        await prefs.remove('password');
-        await prefs.setBool('rememberMe', false); // Beni Hatırla'yı da kapat
-      }
-    } else {
-      debugPrint('Kayıtlı kimlik bilgisi bulunamadı veya Beni Hatırla aktif değil veya oturum açılmadı.');
-      // Kayıtlı bilgi yoksa veya oturum açılamazsa, giriş ekranında kalır.
+    if (session != null && mounted) {
+      debugPrint('Aktif Supabase oturumu var, ana sayfaya yönlendiriliyor.');
+      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
@@ -129,18 +81,14 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (response.session != null && mounted) {
-          // Giriş başarılı: Beni Hatırla durumuna göre bilgileri kaydet veya sil
+          // "Beni Hatırla" yalnızca e-postayı bir sonraki açılışta hazır getirir.
+          // Şifre asla saklanmaz; oturumu Supabase SDK güvenli şekilde yönetir.
           if (_rememberMe) {
             await prefs.setString('email', email);
-            // Şifreyi güvenlik nedeniyle kaydetmek yerine, şifre her zaman boş bırakılmalı
-            // Supabase SDK'sı oturum bilgilerini zaten güvenli bir şekilde yönetir.
-            // Bu satırı güvenlik için yorum satırı yapıyorum.
-            // await prefs.setString('password', password);
-            await prefs.setBool('rememberMe', true); // Beni Hatırla durumunu kaydet
+            await prefs.setBool('rememberMe', true);
           } else {
             await prefs.remove('email');
-            await prefs.remove('password');
-            await prefs.setBool('rememberMe', false); // Beni Hatırla durumunu kaydet
+            await prefs.setBool('rememberMe', false);
           }
           Navigator.pushReplacementNamed(context, '/home');
         }
@@ -380,16 +328,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
                             ),
                             value: _rememberMe,
-                            onChanged: (bool? newValue) async { // onChanged'i async yapıldı
+                            onChanged: (bool? newValue) async {
                               setState(() {
                                 _rememberMe = newValue ?? false;
                               });
-                              // Beni Hatırla durumunu doğrudan SharedPreferences'a kaydet
                               final prefs = await SharedPreferences.getInstance();
                               await prefs.setBool('rememberMe', _rememberMe);
-                              if (!_rememberMe) { // Eğer beni hatırla kapatıldıysa, kayıtlı bilgileri temizle
+                              if (!_rememberMe) {
                                 await prefs.remove('email');
-                                await prefs.remove('password'); // Şifre zaten kaydedilmiyor ama güvenlik için ekledim
                               }
                             },
                             controlAffinity: ListTileControlAffinity.leading, // Checkbox solda

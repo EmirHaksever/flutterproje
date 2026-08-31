@@ -217,7 +217,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   Future<void> _signOut() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('email');
-    await prefs.remove('password');
     await prefs.setBool('rememberMe', false);
 
     await supabase.auth.signOut();
