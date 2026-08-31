@@ -355,24 +355,26 @@ class _MyListsPageState extends State<MyListsPage> {
   }
 
   void _showShareDialog(String listId, String listName) {
-    final TextEditingController _sharedUserIdController = TextEditingController();
+    final emailController = TextEditingController();
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('$listName Listesini Paylaş'),
+          title: Text('"$listName" listesini paylaş'),
           content: TextField(
-            controller: _sharedUserIdController,
+            controller: emailController,
+            keyboardType: TextInputType.emailAddress,
+            autofocus: true,
             decoration: const InputDecoration(
-              hintText: 'Paylaşmak istediğiniz kullanıcının ID\'sini girin',
+              labelText: 'Kullanıcının e-posta adresi',
+              hintText: 'ornek@email.com',
+              prefixIcon: Icon(Icons.alternate_email),
             ),
           ),
           actions: <Widget>[
             TextButton(
               child: const Text('İptal', style: TextStyle(color: Colors.grey)),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -380,18 +382,16 @@ class _MyListsPageState extends State<MyListsPage> {
                 foregroundColor: Colors.white,
               ),
               child: const Text('Paylaş'),
-              onPressed: () async {
-                final String sharedUserId = _sharedUserIdController.text.trim();
-                if (sharedUserId.isNotEmpty) {
-                  Navigator.of(context).pop();
-                  await _shareList(listId, sharedUserId);
-                } else {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Kullanıcı ID\'si boş olamaz!')),
-                    );
-                  }
+              onPressed: () {
+                final email = emailController.text.trim().toLowerCase();
+                if (email.isEmpty || !email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Geçerli bir e-posta adresi girin.')),
+                  );
+                  return;
                 }
+                Navigator.of(dialogContext).pop();
+                _shareListByEmail(listId, email);
               },
             ),
           ],
@@ -400,8 +400,10 @@ class _MyListsPageState extends State<MyListsPage> {
     );
   }
 
-  Future<void> _shareList(String listId, String sharedUserId) async {
-    if (sharedUserId == _userId) {
+  Future<void> _shareListByEmail(String listId, String email) async {
+    final currentUserEmail =
+        supabase.auth.currentUser?.email?.toLowerCase();
+    if (email == currentUserEmail) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Kendi listenizi kendinizle paylaşamazsınız.')),
@@ -411,24 +413,28 @@ class _MyListsPageState extends State<MyListsPage> {
     }
 
     try {
-      final userExists = await supabase
+      // 1) E-postadan hedef kullanıcıyı bul
+      final targetUser = await supabase
           .from('users')
           .select('id')
-          .eq('id', sharedUserId)
+          .eq('email', email)
           .maybeSingle();
 
-      if (userExists == null) {
+      if (targetUser == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Paylaşmak istediğiniz kullanıcı bulunamadı.')),
+            const SnackBar(content: Text('Bu e-posta ile kayıtlı bir kullanıcı bulunamadı.')),
           );
         }
         return;
       }
 
+      final String sharedUserId = targetUser['id'] as String;
+
+      // 2) Zaten paylaşılmış mı?
       final existingShare = await supabase
           .from('shared_lists')
-          .select()
+          .select('id')
           .eq('list_id', listId)
           .eq('user_id', sharedUserId)
           .maybeSingle();
@@ -442,13 +448,12 @@ class _MyListsPageState extends State<MyListsPage> {
         return;
       }
 
-      await supabase
-          .from('shared_lists')
-          .insert({
+      // 3) Paylaş (RLS: yalnızca listenin sahibi ekleyebilir)
+      await supabase.from('shared_lists').insert({
         'list_id': listId,
         'user_id': sharedUserId,
+        'user_email': email,
         'role': 'editor',
-        'created_at': DateTime.now().toIso8601String(),
         'shared_by_user_id': _userId,
       });
 
