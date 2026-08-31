@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SettingsPage extends StatefulWidget {
   final void Function() toggleTheme;
@@ -45,6 +46,45 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  Future<void> _sendPasswordReset() async {
+    final email = Supabase.instance.client.auth.currentUser?.email;
+    if (email == null) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Şifre sıfırlama'),
+        content: Text(
+            '$email adresine bir şifre sıfırlama bağlantısı gönderilsin mi?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Gönder')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Sıfırlama bağlantısı e-postana gönderildi.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bağlantı gönderilemedi.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,9 +127,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const Divider(),
             ListTile(
-              title: const Text("Gizlilik ve Güvenlik"),
-              subtitle: const Text("Şifre sıfırlama ve güvenlik ayarları"),
-              onTap: () {},
+              leading: const Icon(Icons.lock_reset),
+              title: const Text("Şifreyi Sıfırla"),
+              subtitle: const Text("E-postana sıfırlama bağlantısı gönderir"),
+              onTap: _sendPasswordReset,
             ),
             const Divider(),
             ListTile(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'friends_screen.dart';
+import 'notifications_screen.dart';
 import '../constants/categories.dart';
 
 // Kendi ekranlarınızın importları. Dosya yollarının doğru olduğundan emin olun.
@@ -255,6 +257,28 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
               onTap: () {
                 Navigator.pop(context);
                 _onNavTapped(4); // Geçmiş Listeler'e geçiş (MyListsPage)
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.group_outlined, color: globalPrimaryColor),
+              title: const Text('Arkadaşlar', style: TextStyle(fontWeight: FontWeight.w500)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FriendsScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.notifications_outlined, color: globalPrimaryColor),
+              title: const Text('Bildirimler', style: TextStyle(fontWeight: FontWeight.w500)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
               },
             ),
             ListTile(

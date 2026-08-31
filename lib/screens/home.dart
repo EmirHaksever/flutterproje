@@ -7,6 +7,7 @@ import 'dart:async'; // StreamSubscription için eklendi
 // Diğer ekran importları (örneğin CreateListPage)
 // import 'create_list.dart'; // create_list.dart olarak doğru dosya adı - KULLANILMADIĞI İÇİN KALDIRILDI
 import 'category_detail_page.dart'; // Yeni: Kategori detay sayfası importu
+import 'notifications_screen.dart';
 import '../constants/categories.dart';
 
 // WeeklyData modeli, doğrudan HomePage'deki grafik tarafından kullanıldığı için burada kalır.
@@ -1047,8 +1048,11 @@ class _HomePageState extends State<HomePage> {
                                   IconButton(
                                     icon: const Icon(Icons.notifications_none, color: Colors.white, size: 28),
                                     onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Bildirimler yakında!')),
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const NotificationsScreen(),
+                                        ),
                                       );
                                     },
                                   ),
