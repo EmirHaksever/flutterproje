@@ -638,6 +638,10 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildQuickStats(scheme),
+                      if (shoppingLists.isEmpty && totalItems == 0) ...[
+                        const SizedBox(height: 20),
+                        _buildOnboardingCard(scheme),
+                      ],
                       const SizedBox(height: 28),
                       _buildRecentListsSection(scheme),
                       if (suggestedToday.isNotEmpty) ...[
@@ -823,6 +827,77 @@ class _HomePageState extends State<HomePage> {
   }
 
   // --- Recent lists ---------------------------------------------------
+
+  Widget _buildOnboardingCard(ColorScheme scheme) {
+    Widget step(IconData icon, String title, String sub) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                    color: scheme.primaryContainer, shape: BoxShape.circle),
+                child:
+                    Icon(icon, size: 18, color: scheme.onPrimaryContainer),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface)),
+                    Text(sub,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border:
+            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.waving_hand_rounded, color: scheme.primary),
+              const SizedBox(width: 8),
+              Text('Hoş geldin!',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: scheme.onSurface)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('Üç adımda başlayalım:',
+              style: TextStyle(color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          step(Icons.playlist_add_rounded, 'Liste oluştur',
+              'Sağ alttaki + ile yeni bir liste aç'),
+          step(Icons.add_shopping_cart_rounded, 'Ürün ekle',
+              'Kategori ve mağaza bilgisiyle ürünleri gir'),
+          step(Icons.psychology_rounded, 'AI\'dan yardım al',
+              'Stok takibi ve yemek önerileri için AI Asistan'),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
 
   Widget _buildRecentListsSection(ColorScheme scheme) {
     return Column(
