@@ -31,6 +31,10 @@ class UserRepository {
     await _client.from('users').update({'name': name.trim()}).eq('id', _uid);
   }
 
+  Future<void> updateAvatarUrl(String? url) async {
+    await _client.from('users').update({'avatar_url': url}).eq('id', _uid);
+  }
+
   Future<void> updatePreferredCategories(List<String> categories) async {
     await _client
         .from('users')

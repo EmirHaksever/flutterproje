@@ -12,16 +12,27 @@ class ImageRepository {
 
   final SupabaseClient _client;
   static const _bucket = 'product-images';
+  static const _avatarBucket = 'avatars';
 
-  Future<String> uploadProductImage(
-    Uint8List bytes, {
-    String extension = 'jpg',
+  Future<String> uploadProductImage(Uint8List bytes,
+          {String extension = 'jpg'}) =>
+      _upload(_bucket, bytes, extension);
+
+  Future<String> uploadAvatar(Uint8List bytes, {String extension = 'jpg'}) =>
+      _upload(_avatarBucket, bytes, extension, prefix: 'avatar_');
+
+  Future<String> _upload(
+    String bucket,
+    Uint8List bytes,
+    String extension, {
+    String prefix = '',
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw StateError('Oturum yok.');
 
     final ext = extension.replaceAll('.', '').toLowerCase();
-    final path = '$uid/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final path =
+        '$uid/$prefix${DateTime.now().millisecondsSinceEpoch}.$ext';
     final contentType = switch (ext) {
       'png' => 'image/png',
       'webp' => 'image/webp',
@@ -29,12 +40,12 @@ class ImageRepository {
       _ => 'image/jpeg',
     };
 
-    await _client.storage.from(_bucket).uploadBinary(
+    await _client.storage.from(bucket).uploadBinary(
           path,
           bytes,
           fileOptions: FileOptions(contentType: contentType, upsert: false),
         );
-    return _client.storage.from(_bucket).getPublicUrl(path);
+    return _client.storage.from(bucket).getPublicUrl(path);
   }
 
   /// Genel URL'den dosya yolunu çıkarıp siler (hatayı yutar).
