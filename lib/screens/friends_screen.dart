@@ -110,7 +110,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Arkadaşlıktan çıkar'),
-        content: Text('${f.friendEmail} arkadaşlıktan çıkarılsın mı?'),
+        content: Text('${f.displayName} arkadaşlıktan çıkarılsın mı?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -126,7 +126,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
     if (ok != true) return;
     try {
-      await _repo.removeFriend(f.friendEmail);
+      await _repo.removeFriend(f.friendId);
       _load();
     } catch (_) {
       _snack('İşlem başarısız.', error: true);
@@ -205,9 +205,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
         itemCount: _friends.length,
         itemBuilder: (context, i) {
           final f = _friends[i];
+          final hasName =
+              f.friendName != null && f.friendName!.trim().isNotEmpty;
           return _row(
             scheme,
-            f.friendEmail,
+            name: f.displayName,
+            subtitle: hasName ? f.friendEmail : null,
+            avatarUrl: f.avatarUrl,
             trailing: PopupMenuButton<String>(
               icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
               onSelected: (v) {
@@ -240,10 +244,15 @@ class _FriendsScreenState extends State<FriendsScreen> {
         itemCount: list.length,
         itemBuilder: (context, i) {
           final r = list[i];
-          final name = r.otherEmail.isEmpty ? 'Kullanıcı' : r.otherEmail;
+          final name =
+              r.displayName.isEmpty ? 'Kullanıcı' : r.displayName;
+          final hasName =
+              r.otherName != null && r.otherName!.trim().isNotEmpty;
           return _row(
             scheme,
-            name,
+            name: name,
+            subtitle: hasName ? r.otherEmail : null,
+            avatarUrl: r.otherAvatarUrl,
             trailing: incoming
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
@@ -268,22 +277,38 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
   }
 
-  Widget _row(ColorScheme scheme, String email, {required Widget trailing}) {
-    final letter =
-        email.isNotEmpty ? email[0].toUpperCase() : '?';
+  Widget _row(
+    ColorScheme scheme, {
+    required String name,
+    String? subtitle,
+    String? avatarUrl,
+    required Widget trailing,
+  }) {
+    final letter = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       leading: CircleAvatar(
         backgroundColor: AppTheme.heroGreenBg,
-        child: Text(letter,
-            style: TextStyle(
-                fontWeight: FontWeight.w700, color: scheme.primary)),
+        backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+            ? NetworkImage(avatarUrl)
+            : null,
+        child: (avatarUrl == null || avatarUrl.isEmpty)
+            ? Text(letter,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700, color: scheme.primary))
+            : null,
       ),
-      title: Text(email,
-          style: const TextStyle(
-              fontSize: 13.5, fontWeight: FontWeight.w600),
+      title: Text(name,
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
           maxLines: 1,
           overflow: TextOverflow.ellipsis),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle,
+              style: TextStyle(
+                  fontSize: 11, color: scheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
       trailing: trailing,
     );
   }
