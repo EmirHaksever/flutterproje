@@ -157,173 +157,169 @@ class _CreateListPageState extends State<CreateListPage> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
-    // Ensure globalPrimaryColor is a MaterialColor to use shades
-    final MaterialColor globalPrimaryColor = widget.customPrimarySwatch;
+    final scheme = Theme.of(context).colorScheme;
 
-    // Filtrelenmiş ürün listesi
-    List<Map<String, dynamic>> filteredProducts = products.where((product) {
-      if (_filterCategory == null || _filterCategory == 'Tümü') {
-        return true; // Kategori filtresi yoksa tümünü göster
-      }
-      return product['category'] == _filterCategory;
+    final filtered = products.where((p) {
+      if (_filterCategory == null || _filterCategory == 'Tümü') return true;
+      return p['category'] == _filterCategory;
     }).toList();
-
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _listNameController.text.isEmpty ? 'Yeni Liste Oluştur' : _listNameController.text,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: globalPrimaryColor, // Tema rengini kullan
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveList,
-            tooltip: 'Listeyi Kaydet',
+        title: const Text('Yeni Liste'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        children: [
+          TextField(
+            controller: _listNameController,
+            decoration: const InputDecoration(
+              labelText: 'Liste adı',
+              hintText: 'Örn: Haftalık Market',
+              prefixIcon: Icon(Icons.drive_file_rename_outline),
+            ),
+            onChanged: (_) => setState(() {}),
           ),
+          const SizedBox(height: 20),
+          _sectionLabel(scheme, 'Ürün ekle'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildAddForm(scheme),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _sectionLabel(scheme, 'Ürünler (${products.length})'),
+              if (widget.availableCategories.isNotEmpty)
+                _filterChip(scheme),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text('Henüz ürün eklenmedi.',
+                    style: TextStyle(color: scheme.onSurfaceVariant)),
+              ),
+            )
+          else
+            ...filtered.map((p) => _productCard(scheme, p)),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Liste Adı Girişi
-            TextField(
-              controller: _listNameController,
-              decoration: InputDecoration(
-                labelText: 'Liste Adı',
-                hintText: 'Örn: Haftalık Market Listesi',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: Icon(Icons.list_alt, color: globalPrimaryColor),
-              ),
-              onChanged: (value) {
-                setState(() {}); // AppBar başlığını güncellemek için
-              },
-            ),
-            const SizedBox(height: 20),
-
-            // Ürün Ekleme Formu
-            _buildProductInputForm(globalPrimaryColor),
-            const SizedBox(height: 20),
-
-            // Kategori Filtreleme Dropdown'ı (Şimdi sadece mevcut kategorileri kullanıyor)
-            _buildCategoryFilterDropdown(globalPrimaryColor),
-            const SizedBox(height: 20),
-
-            // Ürün Listesi
-            Expanded(
-              child: _buildProductList(filteredProducts, globalPrimaryColor),
-            ),
-          ],
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.fromLTRB(
+            16, 8, 16, 8 + MediaQuery.of(context).padding.bottom),
+        child: FilledButton.icon(
+          onPressed: _saveList,
+          icon: const Icon(Icons.check_rounded),
+          label: const Text('Listeyi Kaydet'),
+          style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50)),
         ),
       ),
     );
   }
 
-  // Ürün Ekleme Formunu oluşturan yardımcı metod
-  Widget _buildProductInputForm(MaterialColor globalPrimaryColor) {
+  Widget _sectionLabel(ColorScheme scheme, String text) {
+    return Text(text,
+        style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: scheme.primary));
+  }
+
+  Widget _buildAddForm(ColorScheme scheme) {
+    final catItems = [
+      ...widget.availableCategories.map((c) => DropdownMenuItem(
+          value: c['name'].toString(), child: Text(c['name'].toString()))),
+      const DropdownMenuItem(
+          value: 'Yeni Kategori Ekle', child: Text('+ Yeni kategori')),
+    ];
+    final marketItems = [
+      ..._availableMarkets.map(
+          (m) => DropdownMenuItem(value: m, child: Text(m))),
+      const DropdownMenuItem(
+          value: 'Yeni Mağaza Ekle', child: Text('+ Yeni mağaza')),
+    ];
+
     return Column(
       children: [
         TextField(
           controller: _productNameController,
-          decoration: InputDecoration(
-            labelText: 'Ürün Adı',
-            hintText: 'Örn: Süt, Ekmek',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            prefixIcon: Icon(Icons.shopping_basket, color: globalPrimaryColor),
+          decoration: const InputDecoration(
+            labelText: 'Ürün adı',
+            hintText: 'Örn: Süt',
+            prefixIcon: Icon(Icons.shopping_basket_outlined),
           ),
-          onSubmitted: (_) => _addProduct(), // Enter'a basınca ekle
+          onSubmitted: (_) => _addProduct(),
         ),
-        const SizedBox(height: 15),
-        TextField( // Yeni: Adet sayısı girişi
-          controller: _quantityController,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Adet Sayısı (Opsiyonel)',
-            hintText: 'Örn: 2, 500gr',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            prefixIcon: Icon(Icons.numbers, color: globalPrimaryColor),
-          ),
-        ),
-        const SizedBox(height: 15),
-        TextField( // Yeni: Özellikler girişi
-          controller: _featuresController,
-          decoration: InputDecoration(
-            labelText: 'Özellikler (Opsiyonel, Virgülle Ayırın)',
-            hintText: 'Örn: organik, glutensiz, büyük boy',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            prefixIcon: Icon(Icons.label_outline, color: globalPrimaryColor),
-            suffixIcon: IconButton( // Add button moved here for product, quantity, features
-              icon: Icon(Icons.add_circle, color: globalPrimaryColor, size: 30),
-              onPressed: _addProduct,
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _quantityController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Adet',
+                  prefixIcon: Icon(Icons.tag),
+                ),
+              ),
             ),
-          ),
-          onSubmitted: (_) => _addProduct(), // Enter'a basınca ekle
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _featuresController,
+                decoration: const InputDecoration(
+                  labelText: 'Etiketler',
+                  hintText: 'organik, büyük',
+                ),
+                onSubmitted: (_) => _addProduct(),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 15),
-        // Kategori Seçimi (Dropdown)
+        const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           initialValue: _selectedCategory,
-          hint: const Text('Kategori Seç'),
-          decoration: InputDecoration(
+          isExpanded: true,
+          decoration: const InputDecoration(
             labelText: 'Kategori',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            prefixIcon: Icon(Icons.category, color: globalPrimaryColor),
+            prefixIcon: Icon(Icons.category_outlined),
           ),
-          // availableCategories'den direkt çekiyoruz
-          items: [
-            ...widget.availableCategories.map((cat) => DropdownMenuItem(value: cat['name'].toString(), child: Text(cat['name'].toString()))),
-            DropdownMenuItem(value: 'Yeni Kategori Ekle', child: Row(
-              children: [
-                Icon(Icons.add, color: globalPrimaryColor),
-                const SizedBox(width: 8),
-                const Text('Yeni Kategori Ekle'),
-              ],
-            )),
-          ],
-          onChanged: (value) {
-            setState(() {
-              if (value == 'Yeni Kategori Ekle') {
-                _showNewCategoryInput = true;
-                _selectedCategory = null; // Dropdown'ı sıfırla
-              } else {
-                _selectedCategory = value;
-                _showNewCategoryInput = false;
-              }
-            });
-          },
+          items: catItems,
+          onChanged: (v) => setState(() {
+            if (v == 'Yeni Kategori Ekle') {
+              _showNewCategoryInput = true;
+              _selectedCategory = null;
+            } else {
+              _selectedCategory = v;
+              _showNewCategoryInput = false;
+            }
+          }),
         ),
         if (_showNewCategoryInput) ...[
-          const SizedBox(height: 15),
+          const SizedBox(height: 12),
           TextField(
             controller: _newCategoryController,
             decoration: InputDecoration(
-              labelText: 'Yeni Kategori Adı',
-              hintText: 'Örn: Hobi Malzemeleri',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              prefixIcon: Icon(Icons.add_box, color: globalPrimaryColor),
+              labelText: 'Yeni kategori adı',
               suffixIcon: IconButton(
-                icon: Icon(Icons.check_circle, color: globalPrimaryColor),
+                icon: Icon(Icons.check_circle, color: scheme.primary),
                 onPressed: () {
-                  if (_newCategoryController.text.isNotEmpty) {
+                  if (_newCategoryController.text.trim().isNotEmpty) {
                     setState(() {
-                      final newCategoryName = _newCategoryController.text;
-                      // widget.availableCategories listesini de güncellememiz gerekir ki dropdown'da gözüksün.
-                      // Ancak widget'tan gelen liste immutable olabilir.
-                      // Bunun yerine bu durumda ana uygulama tarafında bir mekanizma olması daha sağlıklı olur
-                      // veya sadece bu oturum için _availableTags'e ekleyip dropdown'da göstermeliyiz.
-                      // Mevcut durumda _availableTags kaldırıldığı için, bu yeni kategorinin sadece seçili kalmasını sağlarız.
-                      _selectedCategory = newCategoryName;
+                      _selectedCategory = _newCategoryController.text.trim();
                       _showNewCategoryInput = false;
                       _newCategoryController.clear();
-                      
-                      // Eğer yeni kategori gerçekten kalıcı olarak eklensin isteniyorsa,
-                      // buraya Supabase'e kategori ekleme veya HomePage'deki availableCategories listesini güncelleme mantığı eklenmeli.
-                      // Şimdilik sadece bu dropdown için geçici olarak seçili kalıyor.
                     });
                   }
                 },
@@ -331,54 +327,38 @@ class _CreateListPageState extends State<CreateListPage> {
             ),
           ),
         ],
-        const SizedBox(height: 15),
-        // Market Seçimi (Dropdown)
+        const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           initialValue: _selectedMarket,
-          hint: const Text('Market Seç (Opsiyonel)'),
-          decoration: InputDecoration(
-            labelText: 'Market',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            prefixIcon: Icon(Icons.store, color: globalPrimaryColor),
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Mağaza (opsiyonel)',
+            prefixIcon: Icon(Icons.storefront_outlined),
           ),
-          items: [
-            ..._availableMarkets.map((market) => DropdownMenuItem(value: market, child: Text(market))),
-            DropdownMenuItem(value: 'Yeni Mağaza Ekle', child: Row(
-              children: [
-                Icon(Icons.add, color: globalPrimaryColor),
-                const SizedBox(width: 8),
-                const Text('Yeni Mağaza Ekle'),
-              ],
-            )),
-          ],
-          onChanged: (value) {
-            setState(() {
-              if (value == 'Yeni Mağaza Ekle') {
-                _showNewMarketInput = true;
-                _selectedMarket = null; // Dropdown'ı sıfırla
-              } else {
-                _selectedMarket = value;
-                _showNewMarketInput = false;
-              }
-            });
-          },
+          items: marketItems,
+          onChanged: (v) => setState(() {
+            if (v == 'Yeni Mağaza Ekle') {
+              _showNewMarketInput = true;
+              _selectedMarket = null;
+            } else {
+              _selectedMarket = v;
+              _showNewMarketInput = false;
+            }
+          }),
         ),
         if (_showNewMarketInput) ...[
-          const SizedBox(height: 15),
+          const SizedBox(height: 12),
           TextField(
             controller: _newMarketController,
             decoration: InputDecoration(
-              labelText: 'Yeni Mağaza Adı',
-              hintText: 'Örn: Yerel Bakkal',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              prefixIcon: Icon(Icons.add_box, color: globalPrimaryColor),
+              labelText: 'Yeni mağaza adı',
               suffixIcon: IconButton(
-                icon: Icon(Icons.check_circle, color: globalPrimaryColor),
+                icon: Icon(Icons.check_circle, color: scheme.primary),
                 onPressed: () {
-                  if (_newMarketController.text.isNotEmpty) {
+                  if (_newMarketController.text.trim().isNotEmpty) {
                     setState(() {
-                      _availableMarkets.add(_newMarketController.text);
-                      _selectedMarket = _newMarketController.text;
+                      _availableMarkets.add(_newMarketController.text.trim());
+                      _selectedMarket = _newMarketController.text.trim();
                       _showNewMarketInput = false;
                       _newMarketController.clear();
                     });
@@ -388,100 +368,106 @@ class _CreateListPageState extends State<CreateListPage> {
             ),
           ),
         ],
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _addProduct,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Ürünü listeye ekle'),
+          ),
+        ),
       ],
     );
   }
 
-  // Kategori filtreleme dropdown'ı oluşturan yardımcı metod
-  Widget _buildCategoryFilterDropdown(MaterialColor globalPrimaryColor) {
-    return DropdownButtonFormField<String>(
-      initialValue: _filterCategory,
-      hint: const Text('Kategoriye Göre Filtrele'),
-      decoration: InputDecoration(
-        labelText: 'Listeyi Filtrele',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        prefixIcon: Icon(Icons.filter_list, color: globalPrimaryColor),
+  Widget _filterChip(ColorScheme scheme) {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: _filterCategory ?? 'Tümü',
+        icon: const Icon(Icons.filter_list_rounded),
+        style: TextStyle(color: scheme.onSurface, fontSize: 13),
+        borderRadius: BorderRadius.circular(12),
+        items: [
+          const DropdownMenuItem(value: 'Tümü', child: Text('Tümü')),
+          ...widget.availableCategories.map((c) => DropdownMenuItem(
+              value: c['name'].toString(),
+              child: Text(c['name'].toString()))),
+        ],
+        onChanged: (v) => setState(() => _filterCategory = v),
       ),
-      items: [
-        const DropdownMenuItem(value: 'Tümü', child: Text('Tümü')),
-        // Filtreleme için widget'tan gelen kategorileri kullan
-        ...widget.availableCategories.map((cat) => DropdownMenuItem(value: cat['name'].toString(), child: Text(cat['name'].toString()))),
-      ],
-      onChanged: (value) {
-        setState(() {
-          _filterCategory = value;
-        });
-      },
     );
   }
 
-  // Ürün listesini oluşturan yardımcı metod
-  Widget _buildProductList(List<Map<String, dynamic>> displayProducts, MaterialColor primaryMaterialColor) {
-    return ListView.builder(
-      itemCount: displayProducts.length,
-      itemBuilder: (context, index) {
-        final product = displayProducts[index];
-        final realIndex = products.indexOf(product);
-        final quantity = product['quantity'] ?? 1; // Adet sayısını al
-        final features = product['features'] as List<String>? ?? []; // Özellikleri al
+  Widget _productCard(ColorScheme scheme, Map<String, dynamic> p) {
+    final realIndex = products.indexOf(p);
+    final done = p['is_completed'] == true;
+    final features = (p['features'] as List?)?.cast<String>() ?? const [];
 
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-          elevation: 3,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: ListTile(
-            title: CheckboxListTile(
-              controlAffinity: ListTileControlAffinity.leading,
-              value: product['is_completed'],
-              onChanged: (bool? newValue) {
-                setState(() {
-                  products[realIndex]['is_completed'] = newValue!;
-                });
-              },
-              title: Text(
-                product['product_name'],
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  decoration: product['is_completed'] ? TextDecoration.lineThrough : TextDecoration.none,
-                  color: product['is_completed'] ? Colors.grey : Colors.black87,
-                ),
-              ),
-              subtitle: Column(
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+        child: Row(
+          children: [
+            Checkbox(
+              value: done,
+              onChanged: (v) =>
+                  setState(() => products[realIndex]['is_completed'] = v),
+            ),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (product['category'] != null)
-                    Text('Kategori: ${product['category']}', style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
-                  if (product['market'] != null)
-                    Text('Mağaza: ${product['market']}', style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
-                  Text('Adet: $quantity', style: TextStyle(color: Colors.grey.shade700, fontSize: 13)), // Adet sayısı gösterimi
-                  if (features.isNotEmpty) // Özellikler varsa göster
+                  Text(
+                    p['product_name'] ?? '',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      decoration: done ? TextDecoration.lineThrough : null,
+                      color: done
+                          ? scheme.onSurfaceVariant
+                          : scheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (p['category'] != null) p['category'],
+                      if (p['market'] != null) p['market'],
+                      'x${p['quantity'] ?? 1}',
+                    ].join(' • '),
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant),
+                  ),
+                  if (features.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
+                      padding: const EdgeInsets.only(top: 6),
                       child: Wrap(
-                        spacing: 8,
+                        spacing: 6,
                         runSpacing: 4,
-                        children: features.map((feature) {
-                          return Chip(
-                            label: Text(feature, style: TextStyle(color: primaryMaterialColor.shade700)),
-                            backgroundColor: primaryMaterialColor.shade50,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            side: BorderSide(color: primaryMaterialColor.shade200),
-                          );
-                        }).toList(),
+                        children: features
+                            .map((f) => Chip(
+                                  label: Text(f,
+                                      style: const TextStyle(fontSize: 11)),
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ))
+                            .toList(),
                       ),
                     ),
                 ],
               ),
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_rounded, color: Colors.red),
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: scheme.error),
+              tooltip: 'Sil',
               onPressed: () => _removeProduct(realIndex),
-              tooltip: 'Ürünü Sil',
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

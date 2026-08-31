@@ -243,13 +243,13 @@ class _StatsPageState extends State<StatsPage> {
               const SizedBox(height: 12),
               Text(
                 value,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87), // Daha büyük ve koyu
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface), // Daha büyük ve koyu
               ),
               const SizedBox(height: 6),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: Colors.grey.shade600, fontWeight: FontWeight.w500), // Daha okunaklı
+                style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500), // Daha okunaklı
               ),
             ],
           ),
@@ -266,7 +266,7 @@ class _StatsPageState extends State<StatsPage> {
         alignment: Alignment.center,
         child: Text(
           'Aylık aktivite verisi bulunmamaktadır.',
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
           textAlign: TextAlign.center,
         ),
       );
@@ -320,7 +320,7 @@ class _StatsPageState extends State<StatsPage> {
                           child: Text(
                             monthLabels[index],
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
                           ),
                         );
                       }
@@ -335,7 +335,7 @@ class _StatsPageState extends State<StatsPage> {
                     getTitlesWidget: (value, meta) {
                       return Text(
                         value.toInt().toString(),
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
                       );
                     },
                   ),
@@ -345,7 +345,7 @@ class _StatsPageState extends State<StatsPage> {
               ),
               borderData: FlBorderData(
                 show: true,
-                border: Border.all(color: Colors.grey.shade200, width: 1),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
               ),
               barGroups: _monthlyActivity.asMap().entries.map((entry) {
                 int index = entry.key;
@@ -361,7 +361,7 @@ class _StatsPageState extends State<StatsPage> {
                       backDrawRodData: BackgroundBarChartRodData(
                         show: true,
                         toY: maxY,
-                        color: Colors.grey.shade100,
+                        color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                   ],
@@ -371,7 +371,7 @@ class _StatsPageState extends State<StatsPage> {
                 show: true,
                 drawVerticalLine: false,
                 getDrawingHorizontalLine: (value) => FlLine(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
                   strokeWidth: 1,
                 ),
               ),
@@ -391,7 +391,7 @@ class _StatsPageState extends State<StatsPage> {
         alignment: Alignment.center,
         child: Text(
           'Kategori verisi bulunmamaktadır.',
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
           textAlign: TextAlign.center,
         ),
       );
@@ -456,7 +456,7 @@ class _StatsPageState extends State<StatsPage> {
         alignment: Alignment.center,
         child: Text(
           'Ürün aktivitesi verisi bulunmamaktadır.',
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
           textAlign: TextAlign.center,
         ),
       );
@@ -533,7 +533,7 @@ class _StatsPageState extends State<StatsPage> {
                 show: true,
                 drawVerticalLine: false,
                 getDrawingHorizontalLine: (value) => FlLine(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
                   strokeWidth: 1,
                 ),
               ),
@@ -551,7 +551,7 @@ class _StatsPageState extends State<StatsPage> {
                           child: Text(
                             monthLabels[index],
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
                           ),
                         );
                       }
@@ -566,7 +566,7 @@ class _StatsPageState extends State<StatsPage> {
                     getTitlesWidget: (value, meta) {
                       return Text(
                         value.toInt().toString(),
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
                       );
                     },
                   ),
@@ -576,7 +576,7 @@ class _StatsPageState extends State<StatsPage> {
               ),
               borderData: FlBorderData(
                 show: true,
-                border: Border.all(color: Colors.grey.shade200, width: 1),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
               ),
               lineBarsData: lines,
               maxY: maxY,
@@ -593,13 +593,11 @@ class _StatsPageState extends State<StatsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Alışveriş İstatistikleri', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: primaryColor,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
+        title: const Text('İstatistikler',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      backgroundColor: Colors.grey[50], // Daha açık arka plan
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: primaryColor))
           : SingleChildScrollView(
@@ -613,7 +611,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -677,7 +675,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -685,7 +683,7 @@ class _StatsPageState extends State<StatsPage> {
                     borderRadius: BorderRadius.circular(12),
                     child: LinearProgressIndicator(
                       value: _completionRate,
-                      backgroundColor: Colors.grey[300],
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       color: primaryColor.shade700,
                       minHeight: 20,
                     ),
@@ -698,7 +696,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -711,7 +709,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -724,7 +722,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -732,7 +730,7 @@ class _StatsPageState extends State<StatsPage> {
                       ? Center(
                           child: Text(
                             'Henüz popüler kategori verisi bulunmamaktadır.',
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
                             textAlign: TextAlign.center,
                           ),
                         )
@@ -754,7 +752,7 @@ class _StatsPageState extends State<StatsPage> {
                                 ),
                                 trailing: Text(
                                   '${category['count']} Ürün',
-                                  style: TextStyle(fontSize: 15, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                                  style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             );
@@ -768,7 +766,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -776,7 +774,7 @@ class _StatsPageState extends State<StatsPage> {
                       ? Center(
                           child: Text(
                             'Henüz popüler ürün verisi bulunmamaktadır.',
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
                             textAlign: TextAlign.center,
                           ),
                         )
@@ -798,7 +796,7 @@ class _StatsPageState extends State<StatsPage> {
                                 ),
                                 trailing: Text(
                                   '${product['count']} Kez Alındı',
-                                  style: TextStyle(fontSize: 15, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                                  style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             );
@@ -812,7 +810,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -825,7 +823,7 @@ class _StatsPageState extends State<StatsPage> {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -847,12 +845,12 @@ class _StatsPageState extends State<StatsPage> {
                                 children: [
                                   Text(
                                     'En Çok Alışveriş Yapılan Mağaza:',
-                                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                                    style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                   ),
                                   const SizedBox(height: 5),
                                   Text(
                                     _mostFrequentMarket,
-                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                                   ),
                                 ],
                               ),
