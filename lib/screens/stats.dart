@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart'; // Grafikler için FlChart kütüphanesi
-import 'package:intl/intl.dart'; // Tarih formatlama için
 
 class StatsPage extends StatefulWidget {
   final MaterialColor customPrimarySwatch;
@@ -227,369 +226,14 @@ class _StatsPageState extends State<StatsPage> {
     }
   }
 
-  // İstatistik kutucuğu için yardımcı widget
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Card(
-        elevation: 5, // Daha belirgin gölge
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), // Daha yuvarlak köşeler
-        margin: const EdgeInsets.all(8.0), // Dış boşluk
-        child: Padding(
-          padding: const EdgeInsets.all(20.0), // İç boşluk
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 48, color: color), // Daha büyük ikon
-              const SizedBox(height: 12),
-              Text(
-                value,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface), // Daha büyük ve koyu
-              ),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500), // Daha okunaklı
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  // Aylık aktivite grafiği için yardımcı widget
-  Widget _buildMonthlyActivityChart() {
-    if (_monthlyActivity.isEmpty || _monthlyActivity.every((element) => element['count'] == 0)) {
-      return Container(
-        height: 250, // Sabit yükseklik
-        alignment: Alignment.center,
-        child: Text(
-          'Aylık aktivite verisi bulunmamaktadır.',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    List<String> monthLabels = _monthlyActivity.map((e) {
-      final parts = e['month'].split('-');
-      final month = int.parse(parts[1]);
-      return DateFormat.MMM('tr_TR').format(DateTime(int.parse(parts[0]), month)); // Ay adını al
-    }).toList();
-
-    double maxY = _monthlyActivity.map((e) => e['count'] as int).reduce((a, b) => a > b ? a : b).toDouble() * 1.2;
-    if (maxY == 0) maxY = 5;
-
-    return AspectRatio(
-      aspectRatio: 1.6,
-      child: Card(
-        elevation: 5,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        margin: const EdgeInsets.all(8.0),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-          child: BarChart(
-            BarChartData(
-              barTouchData: BarTouchData(
-                touchTooltipData: BarTouchTooltipData(
-                  getTooltipColor: (group) => widget.customPrimarySwatch.shade700.withValues(alpha: 0.9),
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                    return BarTooltipItem(
-                      '${monthLabels[groupIndex]} ${rod.toY.toInt()} Ürün',
-                      const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              titlesData: FlTitlesData(
-                show: true,
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 40,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index >= 0 && index < monthLabels.length) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            monthLabels[index],
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
-                          ),
-                        );
-                      }
-                      return const Text('');
-                    },
-                  ),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 35,
-                    getTitlesWidget: (value, meta) {
-                      return Text(
-                        value.toInt().toString(),
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
-                      );
-                    },
-                  ),
-                ),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
-              ),
-              barGroups: _monthlyActivity.asMap().entries.map((entry) {
-                int index = entry.key;
-                Map<String, dynamic> data = entry.value;
-                return BarChartGroupData(
-                  x: index,
-                  barRods: [
-                    BarChartRodData(
-                      toY: (data['count'] as int).toDouble(),
-                      color: widget.customPrimarySwatch.shade600, // Daha koyu ton
-                      width: 20, // Daha geniş çubuklar
-                      borderRadius: BorderRadius.circular(6), // Daha yuvarlak
-                      backDrawRodData: BackgroundBarChartRodData(
-                        show: true,
-                        toY: maxY,
-                        color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                getDrawingHorizontalLine: (value) => FlLine(
-                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
-                  strokeWidth: 1,
-                ),
-              ),
-              maxY: maxY,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Kategori pasta grafiği için yardımcı widget
-  Widget _buildCategoryPieChart() {
-    if (_topCategories.isEmpty || _topCategories.every((element) => element['count'] == 0)) {
-      return Container(
-        height: 250, // Sabit yükseklik
-        alignment: Alignment.center,
-        child: Text(
-          'Kategori verisi bulunmamaktadır.',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    List<PieChartSectionData> sections = [];
-    double total = _topCategories.fold(0, (sum, item) => sum + (item['count'] as int));
-    List<Color> pieColors = [
-      widget.customPrimarySwatch.shade800,
-      widget.customPrimarySwatch.shade600,
-      widget.customPrimarySwatch.shade400,
-      widget.customPrimarySwatch.shade200,
-      Colors.grey.shade300,
-    ];
-
-    for (int i = 0; i < _topCategories.length; i++) {
-      final category = _topCategories[i];
-      final value = (category['count'] as int).toDouble();
-      final percentage = (value / total * 100).toStringAsFixed(1);
-      sections.add(
-        PieChartSectionData(
-          color: pieColors[i % pieColors.length],
-          value: value,
-          title: '${category['name']}\n%$percentage',
-          radius: 80, // Dilim yarıçapı
-          titleStyle: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-          titlePositionPercentageOffset: 0.55,
-        ),
-      );
-    }
-
-    return AspectRatio(
-      aspectRatio: 1.3,
-      child: Card(
-        elevation: 5,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        margin: const EdgeInsets.all(8.0),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: PieChart(
-            PieChartData(
-              sections: sections,
-              borderData: FlBorderData(show: false),
-              sectionsSpace: 2, // Dilimler arası boşluk
-              centerSpaceRadius: 40, // Ortadaki boşluk
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Yeni: Ürün aktivitesi çizgi grafiği için yardımcı widget
-  Widget _buildProductActivityLineChart() {
-    if (_productActivityData.isEmpty || _productActivityData.values.every((list) => list.every((spot) => spot.y == 0))) {
-      return Container(
-        height: 250,
-        alignment: Alignment.center,
-        child: Text(
-          'Ürün aktivitesi verisi bulunmamaktadır.',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    List<String> monthLabels = [];
-    DateTime now = DateTime.now();
-    for (int i = 5; i >= 0; i--) {
-      DateTime month = DateTime(now.year, now.month - i, 1);
-      monthLabels.add(DateFormat.MMM('tr_TR').format(month));
-    }
-
-    double maxY = 0;
-    for (var list in _productActivityData.values) {
-      for (var spot in list) {
-        if (spot.y > maxY) maxY = spot.y;
-      }
-    }
-    maxY = maxY * 1.2; // Biraz boşluk bırak
-
-    List<LineChartBarData> lines = [];
-    List<Color> lineColors = [
-      Colors.blue.shade400,
-      Colors.green.shade400,
-      Colors.orange.shade400,
-      Colors.purple.shade400,
-      Colors.red.shade400,
-    ];
-
-    int colorIndex = 0;
-    _productActivityData.forEach((productName, spots) {
-      lines.add(
-        LineChartBarData(
-          spots: spots,
-          isCurved: true,
-          color: lineColors[colorIndex % lineColors.length],
-          barWidth: 3,
-          isStrokeCapRound: true,
-          dotData: const FlDotData(show: false), // Noktaları gizle
-          belowBarData: BarAreaData(
-            show: true,
-            color: lineColors[colorIndex % lineColors.length].withValues(alpha: 0.3),
-          ),
-        ),
-      );
-      colorIndex++;
-    });
-
-    return AspectRatio(
-      aspectRatio: 1.6,
-      child: Card(
-        elevation: 5,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        margin: const EdgeInsets.all(8.0),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-          child: LineChart(
-            LineChartData(
-              lineTouchData: LineTouchData(
-                touchTooltipData: LineTouchTooltipData(
-                  getTooltipColor: (touchedSpot) => Colors.blueGrey,
-                  getTooltipItems: (touchedSpots) {
-                    return touchedSpots.map((touchedSpot) {
-                      final productName = _productActivityData.keys.elementAt(touchedSpot.barIndex);
-                      return LineTooltipItem(
-                        '$productName\n${monthLabels[touchedSpot.x.toInt()]}: ${touchedSpot.y.toInt()} Ürün',
-                        const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      );
-                    }).toList();
-                  },
-                ),
-              ),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                getDrawingHorizontalLine: (value) => FlLine(
-                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
-                  strokeWidth: 1,
-                ),
-              ),
-              titlesData: FlTitlesData(
-                show: true,
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 40,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index >= 0 && index < monthLabels.length) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            monthLabels[index],
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
-                          ),
-                        );
-                      }
-                      return const Text('');
-                    },
-                  ),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 35,
-                    getTitlesWidget: (value, meta) {
-                      return Text(
-                        value.toInt().toString(),
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
-                      );
-                    },
-                  ),
-                ),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
-              ),
-              lineBarsData: lines,
-              maxY: maxY,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    final MaterialColor primaryColor = widget.customPrimarySwatch;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -597,273 +241,493 @@ class _StatsPageState extends State<StatsPage> {
             style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Genel İstatistikler Başlığı
-                  Text(
-                    'Genel Bakış',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Genel İstatistik Kartları (İlk Satır)
-                  Row(
-                    children: [
-                      _buildStatCard(
-                        'Toplam Liste',
-                        _totalLists.toString(),
-                        Icons.library_books_rounded,
-                        primaryColor.shade700,
-                      ),
-                      _buildStatCard(
-                        'Toplam Ürün',
-                        _totalItems.toString(),
-                        Icons.shopping_basket_rounded,
-                        primaryColor.shade500,
-                      ),
-                    ],
-                  ),
-                  // Genel İstatistik Kartları (İkinci Satır)
-                  Row(
-                    children: [
-                      _buildStatCard(
-                        'Tamamlandı',
-                        _completedItems.toString(),
-                        Icons.check_circle_rounded,
-                        Colors.green.shade600,
-                      ),
-                      _buildStatCard(
-                        'Tamamlanmadı',
-                        _uncompletedItems.toString(),
-                        Icons.cancel_rounded,
-                        Colors.red.shade600,
-                      ),
-                    ],
-                  ),
-                  // Genel İstatistik Kartları (Üçüncü Satır)
-                  Row(
-                    children: [
-                      _buildStatCard(
-                        'Ort. Ürün/Liste',
-                        _avgItemsPerList.toStringAsFixed(1),
-                        Icons.format_list_numbered_rounded,
-                        primaryColor.shade400,
-                      ),
-                      _buildStatCard(
-                        'En Aktif Gün',
-                        _mostActiveDay,
-                        Icons.calendar_today_rounded,
-                        primaryColor.shade600,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-
-                  // Tamamlama Oranı (LinearProgressIndicator)
-                  Text(
-                    'Genel Tamamlama Oranı: ${(_completionRate * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: LinearProgressIndicator(
-                      value: _completionRate,
-                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      color: primaryColor.shade700,
-                      minHeight: 20,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Aylık Aktivite Başlığı ve Grafiği
-                  Text(
-                    'Aylık Ürün Aktivitesi',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  _buildMonthlyActivityChart(),
-                  const SizedBox(height: 40),
-
-                  // En Popüler Kategoriler Başlığı ve Pasta Grafiği
-                  Text(
-                    'Kategori Dağılımı',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  _buildCategoryPieChart(),
-                  const SizedBox(height: 40),
-
-                  // En Popüler Kategoriler Listesi
-                  Text(
-                    'En Popüler Kategoriler',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  _topCategories.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Henüz popüler kategori verisi bulunmamaktadır.',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _topCategories.length,
-                          itemBuilder: (context, index) {
-                            final category = _topCategories[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 8),
-                              elevation: 3,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              child: ListTile(
-                                leading: Icon(Icons.category_rounded, color: primaryColor.shade600, size: 28),
-                                title: Text(
-                                  category['name'] ?? 'Bilinmiyor',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                                ),
-                                trailing: Text(
-                                  '${category['count']} Ürün',
-                                  style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                  const SizedBox(height: 40),
-
-                  // Yeni: En Popüler Ürünler Başlığı ve Listesi
-                  Text(
-                    'En Popüler Ürünler',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  _topProducts.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Henüz popüler ürün verisi bulunmamaktadır.',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _topProducts.length,
-                          itemBuilder: (context, index) {
-                            final product = _topProducts[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 8),
-                              elevation: 3,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              child: ListTile(
-                                leading: Icon(Icons.shopping_bag_rounded, color: primaryColor.shade600, size: 28),
-                                title: Text(
-                                  product['name'] ?? 'Bilinmiyor',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                                ),
-                                trailing: Text(
-                                  '${product['count']} Kez Alındı',
-                                  style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                  const SizedBox(height: 40),
-
-                  // Yeni: Ürün Aktivitesi Zaman Çizelgesi Başlığı ve Grafiği
-                  Text(
-                    'Ürün Aktivitesi Zaman Çizelgesi',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  _buildProductActivityLineChart(),
-                  const SizedBox(height: 40),
-
-                  // En Çok Alışveriş Yapılan Mağaza Kartı
-                  Text(
-                    'Mağaza Analizi',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  Card(
-                    elevation: 5,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    margin: const EdgeInsets.all(8.0),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.store_mall_directory_rounded, size: 48, color: primaryColor.shade700),
-                              const SizedBox(width: 15),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'En Çok Alışveriş Yapılan Mağaza:',
-                                    style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    _mostFrequentMarket,
-                                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _fetchStats,
+              child: (_totalItems == 0 && _totalLists == 0)
+                  ? _emptyState(scheme)
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      children: [
+                        _completionHero(scheme),
+                        const SizedBox(height: 16),
+                        _kpiGrid(scheme),
+                        const SizedBox(height: 24),
+                        if (_topCategories.isNotEmpty) ...[
+                          _sectionTitle(scheme, 'Kategori Dağılımı'),
+                          _categoryCard(scheme),
+                          const SizedBox(height: 24),
                         ],
-                      ),
+                        _sectionTitle(scheme, 'Aylık Aktivite'),
+                        _monthlyCard(scheme),
+                        const SizedBox(height: 24),
+                        if (_topProducts.isNotEmpty) ...[
+                          _sectionTitle(scheme, 'En Çok Alınan Ürünler'),
+                          _topProductsCard(scheme),
+                          const SizedBox(height: 24),
+                        ],
+                        if (_productActivityData.isNotEmpty) ...[
+                          _sectionTitle(scheme, 'Ürün Trendi (Son 6 Ay)'),
+                          _productTrendCard(scheme),
+                        ],
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
             ),
     );
   }
+
+  Widget _emptyState(ColorScheme scheme) {
+    return ListView(
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        Icon(Icons.insights_rounded, size: 72, color: scheme.primary),
+        const SizedBox(height: 16),
+        Center(
+          child: Text('Henüz istatistik yok',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: scheme.onSurface)),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: Text('Liste ve ürün ekledikçe burası dolacak.',
+              style: TextStyle(color: scheme.onSurfaceVariant)),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(ColorScheme scheme, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10, left: 2),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: scheme.onSurface)),
+    );
+  }
+
+  Widget _cardBox(ColorScheme scheme, Widget child, {EdgeInsets? padding}) {
+    return Container(
+      padding: padding ?? const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border:
+            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: child,
+    );
+  }
+
+  // --- Completion hero ---
+
+  Widget _completionHero(ColorScheme scheme) {
+    final pct = (_completionRate * 100).round();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [scheme.primary, Color.lerp(scheme.primary, Colors.black, 0.3)!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 88,
+            height: 88,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: CircularProgressIndicator(
+                    value: _completionRate,
+                    strokeWidth: 8,
+                    backgroundColor: Colors.white.withValues(alpha: 0.25),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                Text('%$pct',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Tamamlanma',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text('$_completedItems / $_totalItems ürün alındı',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13)),
+                const SizedBox(height: 2),
+                Text('$_uncompletedItems ürün bekliyor',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- KPI grid ---
+
+  Widget _kpiGrid(ColorScheme scheme) {
+    final tiles = [
+      _KpiData(Icons.receipt_long_rounded, '$_totalLists', 'Toplam Liste'),
+      _KpiData(Icons.shopping_bag_rounded, '$_totalItems', 'Toplam Ürün'),
+      _KpiData(Icons.calculate_rounded,
+          _avgItemsPerList.toStringAsFixed(1), 'Ürün / Liste'),
+      _KpiData(Icons.event_available_rounded, _mostActiveDay, 'En Aktif Gün'),
+      _KpiData(Icons.storefront_rounded, _mostFrequentMarket, 'Favori Mağaza'),
+    ];
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.7,
+      children: tiles
+          .map((t) => _cardBox(
+                scheme,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(t.icon, color: scheme.primary, size: 22),
+                    const SizedBox(height: 6),
+                    Text(t.value,
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: scheme.onSurface),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    Text(t.label,
+                        style: TextStyle(
+                            fontSize: 11, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+                padding: const EdgeInsets.all(14),
+              ))
+          .toList(),
+    );
+  }
+
+  // --- Category pie ---
+
+  Widget _categoryCard(ColorScheme scheme) {
+    final palette = [
+      scheme.primary,
+      scheme.tertiary,
+      scheme.secondary,
+      Colors.orange.shade400,
+      Colors.purple.shade300,
+    ];
+    final total = _topCategories.fold<int>(
+        0, (a, c) => a + (c['count'] as int));
+
+    return _cardBox(
+      scheme,
+      Column(
+        children: [
+          SizedBox(
+            height: 170,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 44,
+                sections: List.generate(_topCategories.length, (i) {
+                  final c = _topCategories[i];
+                  final value = (c['count'] as int).toDouble();
+                  return PieChartSectionData(
+                    value: value,
+                    color: palette[i % palette.length],
+                    title: total == 0
+                        ? ''
+                        : '${((value / total) * 100).round()}%',
+                    titleStyle: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold),
+                    radius: 46,
+                  );
+                }),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 14,
+            runSpacing: 8,
+            children: List.generate(_topCategories.length, (i) {
+              final c = _topCategories[i];
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                        color: palette[i % palette.length],
+                        shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                  Text('${c['name']} (${c['count']})',
+                      style: TextStyle(
+                          fontSize: 12, color: scheme.onSurfaceVariant)),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Monthly bar chart ---
+
+  Widget _monthlyCard(ColorScheme scheme) {
+    final maxCount = _monthlyActivity
+        .map((e) => e['count'] as int)
+        .fold<int>(0, (a, b) => a > b ? a : b);
+    final maxY = (maxCount == 0 ? 5 : maxCount * 1.25).toDouble();
+
+    String label(String key) {
+      final parts = key.split('-');
+      const months = [
+        'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
+        'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'
+      ];
+      final m = int.tryParse(parts.length > 1 ? parts[1] : '1') ?? 1;
+      return months[(m - 1).clamp(0, 11)];
+    }
+
+    return _cardBox(
+      scheme,
+      SizedBox(
+        height: 180,
+        child: BarChart(
+          BarChartData(
+            alignment: BarChartAlignment.spaceAround,
+            maxY: maxY,
+            barTouchData: BarTouchData(enabled: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 26,
+                      getTitlesWidget: (v, m) => Text(v.toInt().toString(),
+                          style: TextStyle(
+                              color: scheme.onSurfaceVariant, fontSize: 10)))),
+              bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, m) {
+                        final i = v.toInt();
+                        if (i < 0 || i >= _monthlyActivity.length) {
+                          return const SizedBox();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                              label(_monthlyActivity[i]['month'] as String),
+                              style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 10)),
+                        );
+                      })),
+              topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false)),
+            ),
+            gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (v) => FlLine(
+                    color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    strokeWidth: 1)),
+            borderData: FlBorderData(show: false),
+            barGroups: List.generate(_monthlyActivity.length, (i) {
+              return BarChartGroupData(x: i, barRods: [
+                BarChartRodData(
+                  toY: (_monthlyActivity[i]['count'] as int).toDouble(),
+                  color: scheme.primary,
+                  width: 18,
+                  borderRadius: BorderRadius.circular(4),
+                )
+              ]);
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Top products ranked list ---
+
+  Widget _topProductsCard(ColorScheme scheme) {
+    return _cardBox(
+      scheme,
+      Column(
+        children: List.generate(_topProducts.length, (i) {
+          final p = _topProducts[i];
+          final medalColors = [
+            const Color(0xFFFFD700),
+            const Color(0xFFC0C0C0),
+            const Color(0xFFCD7F32),
+          ];
+          final badgeColor =
+              i < 3 ? medalColors[i] : scheme.surfaceContainerHighest;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration:
+                      BoxDecoration(color: badgeColor, shape: BoxShape.circle),
+                  child: Text('${i + 1}',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: i < 3 ? Colors.black87 : scheme.onSurface)),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(p['name'].toString(),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                Text('${p['count']} kez',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // --- Product trend line chart ---
+
+  Widget _productTrendCard(ColorScheme scheme) {
+    final palette = [scheme.primary, scheme.tertiary, Colors.orange.shade400];
+    final entries = _productActivityData.entries.toList();
+    double maxY = 3;
+    for (final e in entries) {
+      for (final s in e.value) {
+        if (s.y > maxY) maxY = s.y;
+      }
+    }
+
+    return _cardBox(
+      scheme,
+      Column(
+        children: [
+          SizedBox(
+            height: 170,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: maxY * 1.2,
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 24,
+                          getTitlesWidget: (v, m) => Text(v.toInt().toString(),
+                              style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 10)))),
+                  bottomTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (v) => FlLine(
+                        color: scheme.outlineVariant.withValues(alpha: 0.4),
+                        strokeWidth: 1)),
+                borderData: FlBorderData(show: false),
+                lineBarsData: List.generate(entries.length, (i) {
+                  return LineChartBarData(
+                    spots: entries[i].value,
+                    isCurved: true,
+                    color: palette[i % palette.length],
+                    barWidth: 3,
+                    dotData: const FlDotData(show: false),
+                  );
+                }),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 14,
+            runSpacing: 8,
+            children: List.generate(entries.length, (i) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                          color: palette[i % palette.length],
+                          shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Text(entries[i].key,
+                      style: TextStyle(
+                          fontSize: 12, color: scheme.onSurfaceVariant)),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KpiData {
+  final IconData icon;
+  final String value;
+  final String label;
+  _KpiData(this.icon, this.value, this.label);
 }
