@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/friend.dart';
 import '../repositories/friends_repository.dart';
@@ -140,10 +141,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   static String _cleanError(Object e) {
-    // PostgrestException mesajı "... : gerçek mesaj" biçiminde gelebilir.
-    final s = e.toString();
-    final idx = s.lastIndexOf(': ');
-    return idx >= 0 && idx < s.length - 2 ? s.substring(idx + 2) : s;
+    // RPC içindeki `raise exception` mesajı PostgrestException.message'a düşer.
+    if (e is PostgrestException) return e.message;
+    return 'Bir hata oluştu. Lütfen tekrar deneyin.';
   }
 
   @override
