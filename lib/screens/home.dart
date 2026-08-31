@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 
 import 'category_detail_page.dart';
 import 'notifications_screen.dart';
+import 'my_lists.dart';
 import '../constants/categories.dart';
 import '../widgets/ui_kit.dart';
-
-/// Haftalık grafik için basit veri modeli.
-class WeeklyData {
-  final String day;
-  final int itemCount;
-  WeeklyData({required this.day, required int itemCount})
-      : itemCount = itemCount >= 0 ? itemCount : 0;
-}
+import '../theme/app_theme.dart';
 
 class HomePage extends StatefulWidget {
   final MaterialColor customPrimarySwatch;
@@ -32,9 +24,6 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> shoppingLists = [];
   int totalItems = 0;
   int completedItems = 0;
-  List<WeeklyData> weeklyData = [];
-  List<Map<String, dynamic>> topProducts = [];
-  List<String> suggestedToday = [];
   List<Map<String, dynamic>> _dynamicCategories = [];
   List<Map<String, dynamic>> _allAvailableCategories = [];
 
@@ -44,17 +33,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    Intl.defaultLocale = 'tr_TR';
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeDataAndListeners();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
   }
 
-  Future<void> _initializeDataAndListeners() async {
+  Future<void> _initialize() async {
     await fetchUserInfo();
-    await fetchWeeklyData();
-    await fetchTopProducts();
-    await fetchSuggestions();
     await fetchDynamicCategories();
     _setupRealtimeListeners();
   }
@@ -76,11 +59,9 @@ class _HomePageState extends State<HomePage> {
     });
 
     _listItemSubscription =
-        supabase.from('list_items').stream(primaryKey: ['id']).listen((data) {
+        supabase.from('list_items').stream(primaryKey: ['id']).listen((_) {
       if (mounted) {
         fetchStatistics();
-        fetchTopProducts();
-        fetchSuggestions();
         fetchDynamicCategories();
         fetchUserInfo();
       }
@@ -95,7 +76,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Veri çekme
+  // Veri
   // ---------------------------------------------------------------------------
 
   Future<void> fetchUserInfo() async {
@@ -147,70 +128,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       totalItems = response.length;
       completedItems = completed;
-    });
-  }
-
-  Future<void> fetchWeeklyData() async {
-    final oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
-    final response = await supabase
-        .from('list_items')
-        .select('created_at')
-        .gte('created_at', oneWeekAgo.toIso8601String());
-
-    final dailyCounts = {
-      'Pzt': 0, 'Sal': 0, 'Çar': 0, 'Per': 0, 'Cum': 0, 'Cmt': 0, 'Paz': 0
-    };
-    for (var item in response) {
-      final date = DateTime.parse(item['created_at']);
-      final weekday = _turkishDay(date.weekday);
-      dailyCounts[weekday] = dailyCounts[weekday]! + 1;
-    }
-    const orderedDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-    if (!mounted) return;
-    setState(() {
-      weeklyData = orderedDays
-          .map((day) => WeeklyData(day: day, itemCount: dailyCounts[day]!))
-          .toList();
-    });
-  }
-
-  Future<void> fetchTopProducts() async {
-    final response =
-        await supabase.from('list_items').select('product_name').limit(200);
-    final productCount = <String, int>{};
-    for (var item in response) {
-      final name = item['product_name'];
-      if (name != null) productCount[name] = (productCount[name] ?? 0) + 1;
-    }
-    final sorted = productCount.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    if (!mounted) return;
-    setState(() {
-      topProducts = sorted
-          .take(6)
-          .map((e) => {'product_name': e.key, 'count': e.value})
-          .toList();
-    });
-  }
-
-  Future<void> fetchSuggestions() async {
-    final recentItems = await supabase
-        .from('list_items')
-        .select('product_name, is_completed, created_at')
-        .order('created_at', ascending: false)
-        .limit(50);
-    final productCounts = <String, int>{};
-    for (var item in recentItems) {
-      if (item['is_completed'] == false && item['product_name'] != null) {
-        final product = item['product_name'];
-        productCounts[product] = (productCounts[product] ?? 0) + 1;
-      }
-    }
-    final sorted = productCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    if (!mounted) return;
-    setState(() {
-      suggestedToday = sorted.take(3).map((e) => e.key).toList();
     });
   }
 
@@ -292,13 +209,8 @@ class _HomePageState extends State<HomePage> {
   // Yardımcılar
   // ---------------------------------------------------------------------------
 
-  String _turkishDay(int weekday) {
-    const days = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-    return days[weekday - 1];
-  }
-
-  /// En yeni listenin (varsa) adı + tamamlanan/toplam ürün sayısı.
-  ({String name, int done, int total, Map<String, dynamic> raw})? get _activeList {
+  ({String name, int done, int total, Map<String, dynamic> raw})?
+      get _activeList {
     if (shoppingLists.isEmpty) return null;
     final l = shoppingLists.first as Map<String, dynamic>;
     final items = (l['list_items'] as List?) ?? const [];
@@ -311,12 +223,30 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  int _listItemCount(Map<String, dynamic> l) =>
+      ((l['list_items'] as List?) ?? const []).length;
+
+  int _listDoneCount(Map<String, dynamic> l) =>
+      ((l['list_items'] as List?) ?? const [])
+          .where((e) => e['is_completed'] == true)
+          .length;
+
   void _openList(Map<String, dynamic> list) {
     Navigator.pushNamed(context, '/listDetail', arguments: {
       'id': list['id'],
       'name': list['name'],
       'user_id': list['user_id'],
     });
+  }
+
+  void _openAllLists() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            MyListsPage(customPrimarySwatch: widget.customPrimarySwatch),
+      ),
+    );
   }
 
   void _showCategoryManagementSheet() {
@@ -341,7 +271,7 @@ class _HomePageState extends State<HomePage> {
                 Text('Popüler Kategorileri Yönet',
                     style: TextStyle(
                         fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         color: scheme.onSurface)),
                 const SizedBox(height: 6),
                 Text('Ana sayfada göstermek istediklerini seç (en fazla 8).',
@@ -354,13 +284,11 @@ class _HomePageState extends State<HomePage> {
                     itemBuilder: (context, index) {
                       final category = _allAvailableCategories[index];
                       final isSelected = selected.contains(category['name']);
-                      final colors =
-                          (category['colors'] as List?)?.cast<Color>() ??
-                              const [Color(0xFF90A4AE)];
                       return CheckboxListTile(
                         title: Text(category['name']),
-                        secondary: Icon(category['icon'] as IconData,
-                            color: colors.first),
+                        secondary: Text(
+                            categoryEmoji(category['name'] as String),
+                            style: const TextStyle(fontSize: 22)),
                         value: isSelected,
                         onChanged: (v) {
                           modalSetState(() {
@@ -419,47 +347,40 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: _initializeDataAndListeners,
+          onRefresh: _initialize,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 30),
             children: [
               _header(scheme),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
               if (_activeList != null)
                 _activeListHero(scheme, _activeList!)
               else
                 _emptyHero(scheme),
               const SizedBox(height: 16),
               _statRow(scheme),
-              const SizedBox(height: 26),
+              const SizedBox(height: 24),
               SectionHeader(
                 title: 'Kategoriler',
                 actionLabel: 'Tümü',
                 onAction: _showCategoryManagementSheet,
               ),
               _categoryRow(scheme),
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
+              SectionHeader(
+                title: 'Listeler',
+                actionLabel: 'Tümünü Gör',
+                onAction: _openAllLists,
+              ),
+              ..._listCards(),
+              const SizedBox(height: 4),
               _aiCard(scheme),
-              if (suggestedToday.isNotEmpty) ...[
-                const SizedBox(height: 26),
-                _suggestionsSection(scheme),
-              ],
-              if (weeklyData.any((d) => d.itemCount > 0)) ...[
-                const SizedBox(height: 26),
-                _weeklyChartCard(scheme),
-              ],
-              if (topProducts.isNotEmpty) ...[
-                const SizedBox(height: 26),
-                _topProductsCard(scheme),
-              ],
             ],
           ),
         ),
       ),
     );
   }
-
-  // --- Header ------------------------------------------------------------
 
   Widget _header(ColorScheme scheme) {
     return Row(
@@ -471,44 +392,43 @@ class _HomePageState extends State<HomePage> {
               Text(
                 'Merhaba, ${userName.isEmpty ? '' : userName} 👋',
                 style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
-                  color: scheme.onSurface,
-                ),
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onSurface),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
-              Text('Bugün ne planlıyorsun?',
+              const SizedBox(height: 4),
+              Text('Bugün ne planlıyoruz?',
                   style: TextStyle(
                       fontSize: 13, color: scheme.onSurfaceVariant)),
             ],
           ),
         ),
-        _CircleIconButton(
-          icon: Icons.notifications_none_rounded,
-          onTap: () => Navigator.push(
+        IconButton(
+          onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
           ),
+          icon: const Icon(Icons.notifications_none_rounded),
         ),
       ],
     );
   }
 
-  // --- Hero: aktif liste ----------------------------------------------
-
-  Widget _activeListHero(
-      ColorScheme scheme, ({String name, int done, int total, Map<String, dynamic> raw}) a) {
-    final value = a.total == 0 ? 0.0 : a.done / a.total;
-    return InkWell(
+  Widget _activeListHero(ColorScheme scheme,
+      ({String name, int done, int total, Map<String, dynamic> raw}) a) {
+    final ratio = a.total == 0 ? 0.0 : a.done / a.total;
+    return GestureDetector(
       onTap: () => _openList(a.raw),
-      borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: scheme.primaryContainer,
-          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE1F7E6), Color(0xFFF5FBF6)],
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFD4EFD9)),
         ),
         child: Row(
           children: [
@@ -516,28 +436,26 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Aktif Listen',
+                  Text('Aktif Liste',
                       style: TextStyle(
+                          color: scheme.primary,
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onPrimaryContainer)),
-                  const SizedBox(height: 6),
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 5),
                   Text(a.name,
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: scheme.onSurface),
+                      style: const TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w800),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 5),
                   Text('${a.done} / ${a.total} ürün',
                       style: TextStyle(
-                          fontSize: 13, color: scheme.onSurfaceVariant)),
+                          color: scheme.onSurfaceVariant, fontSize: 12)),
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            PercentRing(value: value.toDouble(), size: 60),
+            PercentRing(value: ratio, size: 62),
           ],
         ),
       ),
@@ -548,27 +466,27 @@ class _HomePageState extends State<HomePage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE1F7E6), Color(0xFFF5FBF6)],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFD4EFD9)),
       ),
       child: Row(
         children: [
-          Icon(Icons.playlist_add_rounded,
-              color: scheme.onPrimaryContainer, size: 34),
+          Icon(Icons.playlist_add_rounded, color: scheme.primary, size: 34),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Henüz listen yok',
+                const Text('Henüz listen yok',
                     style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: scheme.onSurface)),
+                        fontSize: 16, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 2),
                 Text('Alttaki + ile ilk listeni oluştur.',
                     style: TextStyle(
-                        fontSize: 13, color: scheme.onSurfaceVariant)),
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -577,28 +495,22 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- 3'lü istatistik -----------------------------------------------
-
   Widget _statRow(ColorScheme scheme) {
     final pending = (totalItems - completedItems).clamp(0, 1 << 30);
     return Row(
       children: [
-        Expanded(
-            child: MiniStatCard(
-                value: '$pending', label: 'Bekleyen Ürün')),
-        const SizedBox(width: 12),
+        Expanded(child: MiniStatCard(value: '$pending', label: 'Bekleyen')),
+        const SizedBox(width: 8),
         Expanded(
             child: MiniStatCard(
                 value: '$completedItems', label: 'Tamamlanan')),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
             child: MiniStatCard(
-                value: '${shoppingLists.length}', label: 'Listelerin')),
+                value: '${shoppingLists.length}', label: 'Listeler')),
       ],
     );
   }
-
-  // --- Kategoriler ---------------------------------------------------
 
   Widget _categoryRow(ColorScheme scheme) {
     if (_dynamicCategories.isEmpty) {
@@ -606,55 +518,25 @@ class _HomePageState extends State<HomePage> {
           style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13));
     }
     return SizedBox(
-      height: 96,
-      child: ListView.separated(
+      height: 90,
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
         itemCount: _dynamicCategories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
         itemBuilder: (context, i) {
           final cat = _dynamicCategories[i];
-          final colors = (cat['colors'] as List?)?.cast<Color>() ??
-              const [Color(0xFF90A4AE), Color(0xFF607D8B)];
-          final count = (cat['count'] as int?) ?? 0;
-          return GestureDetector(
+          final name = cat['name'] as String;
+          return CategoryCard(
+            title: name,
+            emoji: categoryEmoji(name),
+            count: (cat['count'] as int?) ?? 0,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => CategoryDetailPage(
-                  categoryName: cat['name'] as String,
+                  categoryName: name,
                   customPrimarySwatch: widget.customPrimarySwatch,
                 ),
-              ),
-            ),
-            child: SizedBox(
-              width: 64,
-              child: Column(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: colors),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                        cat['icon'] as IconData? ?? Icons.category_outlined,
-                        color: Colors.white,
-                        size: 24),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(cat['name'] as String,
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onSurface),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  Text(count > 0 ? '$count ürün' : '—',
-                      style: TextStyle(
-                          fontSize: 10, color: scheme.onSurfaceVariant)),
-                ],
               ),
             ),
           );
@@ -663,245 +545,68 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- AI Asistan kartı --------------------------------------------
+  List<Widget> _listCards() {
+    if (shoppingLists.isEmpty) {
+      return [
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant),
+          ),
+          child: Text('Henüz listen yok.',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        ),
+      ];
+    }
+    return shoppingLists.take(3).map<Widget>((l) {
+      final list = l as Map<String, dynamic>;
+      return ListCard(
+        title: (list['name'] ?? 'İsimsiz') as String,
+        done: _listDoneCount(list),
+        total: _listItemCount(list),
+        onTap: () => _openList(list),
+      );
+    }).toList();
+  }
 
   Widget _aiCard(ColorScheme scheme) {
-    return InkWell(
+    return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/aiChat'),
-      borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: scheme.primaryContainer,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: scheme.outlineVariant),
         ),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.smart_toy_rounded,
-                  color: scheme.primary, size: 24),
+            CircleAvatar(
+              backgroundColor: AppTheme.heroGreenBg,
+              child: Icon(Icons.auto_awesome, color: scheme.primary),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('AI Asistan',
+                  const Text('AI Asistan',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text('Elindeki malzemelerle ne yapabileceğini keşfet.',
                       style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onSurface)),
-                  const SizedBox(height: 2),
-                  Text(
-                      'Elindeki malzemelerle ne yapabileceğini sor!',
-                      style: TextStyle(
-                          fontSize: 12, color: scheme.onSurfaceVariant)),
+                          fontSize: 11, color: scheme.onSurfaceVariant)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            Icon(Icons.chevron_right, color: scheme.primary),
           ],
         ),
-      ),
-    );
-  }
-
-  // --- Ek bölümler (mockup'ta yok, faydalı olduğu için altta) ------
-
-  Widget _suggestionsSection(ColorScheme scheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionHeader(title: 'Önerilen ürünler'),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: suggestedToday.map((name) {
-            return ActionChip(
-              avatar:
-                  Icon(Icons.add_rounded, size: 18, color: scheme.primary),
-              label: Text(name),
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('"$name" için bir listeye ekleyin.')),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _weeklyChartCard(ColorScheme scheme) {
-    final maxCount = weeklyData
-        .map((e) => e.itemCount)
-        .fold<int>(0, (a, b) => a > b ? a : b);
-    final maxY = (maxCount == 0 ? 5 : maxCount * 1.2).toDouble();
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Haftalık Aktivite',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface)),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 180,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                barTouchData: BarTouchData(enabled: false),
-                maxY: maxY,
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 28,
-                        getTitlesWidget: (v, m) => Text(v.toInt().toString(),
-                            style: TextStyle(
-                                color: scheme.onSurfaceVariant,
-                                fontSize: 10))),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (v, m) {
-                        final i = v.toInt();
-                        if (i < 0 || i >= weeklyData.length) {
-                          return const SizedBox();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(weeklyData[i].day,
-                              style: TextStyle(
-                                  color: scheme.onSurfaceVariant,
-                                  fontSize: 10)),
-                        );
-                      },
-                    ),
-                  ),
-                  topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (v) => FlLine(
-                      color: scheme.outlineVariant.withValues(alpha: 0.4),
-                      strokeWidth: 1),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: List.generate(weeklyData.length, (i) {
-                  return BarChartGroupData(x: i, barRods: [
-                    BarChartRodData(
-                      toY: weeklyData[i].itemCount.toDouble(),
-                      color: scheme.primary,
-                      width: 16,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ]);
-                }),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _topProductsCard(ColorScheme scheme) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Sıkça Alınanlar',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface)),
-          const SizedBox(height: 8),
-          ...topProducts.take(4).map((p) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: scheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.shopping_bag_outlined,
-                        color: scheme.primary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(p['product_name'].toString(),
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurface),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ),
-                  Text('${p['count']}x',
-                      style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
-
-/// Kenarlıklı, dairesel ikon butonu (başlıktaki zil).
-class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Icon(icon, size: 22, color: scheme.onSurface),
       ),
     );
   }
