@@ -246,35 +246,42 @@ class _ProfilePageState extends State<ProfilePage> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
                 children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.settings_outlined),
+                        tooltip: 'Ayarlar',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/settings'),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Adı düzenle',
+                        onPressed: _editName,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                   Center(child: _avatar(scheme)),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            (_userName?.trim().isNotEmpty ?? false)
-                                ? _userName!
-                                : 'İsimsiz',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: scheme.onSurface),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: Icon(Icons.edit_outlined,
-                              size: 18, color: scheme.primary),
-                          onPressed: _editName,
-                        ),
-                      ],
+                    child: Text(
+                      (_userName?.trim().isNotEmpty ?? false)
+                          ? _userName!
+                          : 'İsimsiz',
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: scheme.onSurface),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(height: 3),
                   Center(
                     child: Text(_userEmail ?? 'Misafir',
                         style: TextStyle(
