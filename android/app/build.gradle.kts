@@ -9,7 +9,7 @@ plugins {
 android {
     namespace = "com.example.flutterproje"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    // ndkVersion = "27.0.12077973"  // yerel C/C++ kodu yok; NDK indirmesin
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
