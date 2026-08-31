@@ -2,8 +2,10 @@
 // o kullanıcının cihazlarına FCM push gönderir.
 //
 // Kurulum:
-//   1) supabase secrets set FIREBASE_SERVICE_ACCOUNT="$(cat servis-hesabi.json)"
-//   2) supabase functions deploy send-push
+//   1) PowerShell:
+//      $b64=[Convert]::ToBase64String([IO.File]::ReadAllBytes("servis-hesabi.json"))
+//      npx supabase secrets set FIREBASE_SERVICE_ACCOUNT_B64=$b64
+//   2) npx supabase functions deploy send-push
 //   3) Dashboard > Database > Webhooks: notifications INSERT -> bu fonksiyon
 //
 // (SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY Edge ortamında hazır gelir.)
@@ -57,8 +59,12 @@ Deno.serve(async (req) => {
     const message: string = record?.message ?? "Yeni bir bildirimin var";
     if (!userId) return new Response("no user_id", { status: 200 });
 
-    const saRaw = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
-    if (!saRaw) return new Response("FIREBASE_SERVICE_ACCOUNT yok", { status: 500 });
+    const b64 = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_B64");
+    const raw = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
+    const saRaw = b64 ? atob(b64) : raw;
+    if (!saRaw) {
+      return new Response("FIREBASE_SERVICE_ACCOUNT(_B64) yok", { status: 500 });
+    }
     const sa: ServiceAccount = JSON.parse(saRaw);
 
     const supabase = createClient(
