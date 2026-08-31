@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/settings_controller.dart';
 
 class SettingsPage extends StatefulWidget {
-  // main.dart hâlâ bu geri-çağrıları veriyor (SettingsController'a yönleniyorlar).
   final void Function()? toggleTheme;
   final void Function(Locale)? changeLocale;
 
@@ -16,160 +16,259 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _settings = SettingsController.instance;
+  bool _notifEnabled = true;
 
-  Future<void> _sendPasswordReset() async {
-    final email = Supabase.instance.client.auth.currentUser?.email;
-    if (email == null) return;
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) {
+        setState(() =>
+            _notifEnabled = p.getBool('notificationsEnabled') ?? true);
+      }
+    });
+  }
 
+  String get _themeLabel => switch (_settings.themeMode) {
+        ThemeMode.light => 'Açık',
+        ThemeMode.dark => 'Koyu',
+        ThemeMode.system => 'Sistem',
+      };
+
+  String get _langLabel =>
+      _settings.locale.languageCode == 'en' ? 'English' : 'Türkçe';
+
+  void _snack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+    ));
+  }
+
+  Future<void> _pickTheme() async {
+    final scheme = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final e in const {
+            ThemeMode.system: ('Sistem', Icons.brightness_auto_outlined),
+            ThemeMode.light: ('Açık', Icons.light_mode_outlined),
+            ThemeMode.dark: ('Koyu', Icons.dark_mode_outlined),
+          }.entries)
+            ListTile(
+              leading: Icon(e.value.$2),
+              title: Text(e.value.$1),
+              trailing: _settings.themeMode == e.key
+                  ? Icon(Icons.check, color: scheme.primary)
+                  : null,
+              onTap: () {
+                _settings.setThemeMode(e.key);
+                setState(() {});
+                Navigator.pop(ctx);
+              },
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickLanguage() async {
+    final scheme = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final e in const {'tr': 'Türkçe', 'en': 'English'}.entries)
+            ListTile(
+              title: Text(e.value),
+              trailing: _settings.locale.languageCode == e.key
+                  ? Icon(Icons.check, color: scheme.primary)
+                  : null,
+              onTap: () {
+                _settings.setLocale(Locale(e.key));
+                widget.changeLocale?.call(Locale(e.key));
+                setState(() {});
+                Navigator.pop(ctx);
+              },
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _changePassword() async {
+    final pw1 = TextEditingController();
+    final pw2 = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Şifre sıfırlama'),
-        content: Text(
-            '$email adresine bir şifre sıfırlama bağlantısı gönderilsin mi?'),
+        title: const Text('Şifre Değiştir'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: pw1,
+              obscureText: true,
+              decoration: const InputDecoration(hintText: 'Yeni şifre'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pw2,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(hintText: 'Yeni şifre (tekrar)'),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('İptal')),
-          ElevatedButton(
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Kaydet')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final p1 = pw1.text.trim();
+    if (p1.length < 6) {
+      _snack('Şifre en az 6 karakter olmalı.', error: true);
+      return;
+    }
+    if (p1 != pw2.text.trim()) {
+      _snack('Şifreler eşleşmiyor.', error: true);
+      return;
+    }
+    try {
+      await Supabase.instance.client.auth
+          .updateUser(UserAttributes(password: p1));
+      _snack('Şifren güncellendi.');
+    } catch (e) {
+      debugPrint('Şifre güncellenemedi: $e');
+      _snack('Şifre güncellenemedi. Yeniden giriş yapman gerekebilir.',
+          error: true);
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = Supabase.instance.client.auth.currentUser?.email;
+    if (email == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Şifre Sıfırlama'),
+        content: Text('$email adresine sıfırlama bağlantısı gönderilsin mi?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal')),
+          FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Gönder')),
         ],
       ),
     );
     if (ok != true) return;
-
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(email);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Sıfırlama bağlantısı e-postana gönderildi.')),
-        );
-      }
+      _snack('Sıfırlama bağlantısı e-postana gönderildi.');
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bağlantı gönderilemedi.')),
-        );
-      }
+      _snack('Bağlantı gönderilemedi.', error: true);
     }
   }
 
+  Future<void> _setNotif(bool v) async {
+    setState(() => _notifEnabled = v);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('notificationsEnabled', v);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('Ayarlar')),
       body: ListenableBuilder(
         listenable: _settings,
-        builder: (context, _) {
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              const _SectionTitle('Görünüm'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Tema',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 12),
-                      SegmentedButton<ThemeMode>(
-                        segments: const [
-                          ButtonSegment(
-                              value: ThemeMode.light,
-                              icon: Icon(Icons.light_mode_outlined),
-                              label: Text('Açık')),
-                          ButtonSegment(
-                              value: ThemeMode.system,
-                              icon: Icon(Icons.brightness_auto_outlined),
-                              label: Text('Sistem')),
-                          ButtonSegment(
-                              value: ThemeMode.dark,
-                              icon: Icon(Icons.dark_mode_outlined),
-                              label: Text('Koyu')),
-                        ],
-                        selected: {_settings.themeMode},
-                        onSelectionChanged: (s) =>
-                            _settings.setThemeMode(s.first),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.language),
-                  title: const Text('Dil'),
-                  trailing: DropdownButton<String>(
-                    value: _settings.locale.languageCode,
-                    underline: const SizedBox(),
-                    onChanged: (v) {
-                      if (v != null) _settings.setLocale(Locale(v));
-                    },
-                    items: const [
-                      DropdownMenuItem(value: 'tr', child: Text('Türkçe')),
-                      DropdownMenuItem(value: 'en', child: Text('English')),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const _SectionTitle('Hesap'),
-              Card(
-                child: ListTile(
-                  leading: Icon(Icons.lock_reset, color: scheme.primary),
-                  title: const Text('Şifreyi Sıfırla'),
-                  subtitle:
-                      const Text('E-postana sıfırlama bağlantısı gönderir'),
-                  onTap: _sendPasswordReset,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const _SectionTitle('Hakkında'),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: const Text('Alışveriş Listem'),
-                  subtitle: const Text('Sürüm 1.0.0'),
-                  onTap: () => showAboutDialog(
-                    context: context,
-                    applicationName: 'Alışveriş Listem',
-                    applicationVersion: '1.0.0',
-                    applicationLegalese:
-                        'Paylaşımlı alışveriş listesi + yapay zekâ asistanı.',
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+        builder: (context, _) => ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+          children: [
+            _sectionTitle('Görünüm'),
+            _tile(Icons.brightness_6_outlined, 'Tema',
+                value: _themeLabel, onTap: _pickTheme),
+            _tile(Icons.language_outlined, 'Dil',
+                value: _langLabel, onTap: _pickLanguage),
+            const SizedBox(height: 20),
+            _sectionTitle('Hesap'),
+            _tile(Icons.lock_outline, 'Şifre Değiştir',
+                onTap: _changePassword),
+            _tile(Icons.vpn_key_outlined, 'Şifre Sıfırlama',
+                onTap: _sendPasswordReset),
+            const SizedBox(height: 20),
+            _sectionTitle('Bildirimler'),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _notifEnabled,
+              onChanged: _setNotif,
+              title: const Text('Bildirimleri Etkinleştir',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 20),
+            _tile(Icons.info_outline, 'Uygulama Hakkında',
+                value: 'v1.0.0',
+                onTap: () => showAboutDialog(
+                      context: context,
+                      applicationName: 'Alışveriş Listem',
+                      applicationVersion: '1.0.0',
+                      applicationLegalese:
+                          'Paylaşımlı alışveriş listesi + yapay zekâ asistanı.',
+                    )),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _sectionTitle(String text) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+      padding: const EdgeInsets.only(bottom: 4, top: 4),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.onSurface)),
+    );
+  }
+
+  Widget _tile(IconData icon, String title,
+      {String? value, required VoidCallback onTap}) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      onTap: onTap,
+      leading: Icon(icon, color: scheme.onSurface),
+      title: Text(title,
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w600)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (value != null)
+            Text(value,
+                style: TextStyle(
+                    fontSize: 12, color: scheme.onSurfaceVariant)),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right, size: 20, color: scheme.onSurfaceVariant),
+        ],
       ),
     );
   }
