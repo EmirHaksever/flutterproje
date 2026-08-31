@@ -66,10 +66,9 @@ class _ProfilePageState extends State<ProfilePage> {
     });
     try {
       await supabase.auth.signOut();
-      // SharedPreferences'tan "beni hatırla" bilgilerini temizle
+      // Çıkışta "beni hatırla" tercihini temizle (şifre zaten hiç saklanmıyor)
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('email');
-      await prefs.remove('password'); // Güvenlik için zaten kaydedilmiyor olmalı ama yine de temizle
       await prefs.setBool('rememberMe', false);
 
       if (mounted) {
