@@ -302,26 +302,35 @@ class CategoryCard extends StatelessWidget {
 }
 
 /// Kategori adına göre emoji tahmini (tasarım taslağındaki gibi).
+///
+/// Naif `contains` yerine kelime bazlı eşleşme — yoksa "markET" içindeki
+/// "et" yüzünden yanlış emoji çıkıyor.
 String categoryEmoji(String name) {
-  final n = name.toLowerCase();
-  if (n.contains('meyve')) return '🍎';
-  if (n.contains('sebze')) return '🥦';
-  if (n.contains('süt')) return '🥛';
-  if (n.contains('et') || n.contains('balık') || n.contains('tavuk')) {
-    return '🥩';
-  }
-  if (n.contains('temizlik')) return '🧴';
-  if (n.contains('ekmek') || n.contains('fırın') || n.contains('unlu')) {
-    return '🍞';
-  }
-  if (n.contains('içecek')) return '🥤';
-  if (n.contains('kahvalt')) return '🍳';
-  if (n.contains('bebek')) return '🍼';
-  if (n.contains('atıştır') || n.contains('cips')) return '🍿';
-  if (n.contains('dondur')) return '🧊';
-  if (n.contains('bakliyat') || n.contains('kuru')) return '🫘';
-  if (n.contains('kişisel') || n.contains('bakım')) return '🧼';
-  if (n.contains('kırtasiye')) return '✏️';
-  if (n.contains('elektronik')) return '🔌';
+  final words = name
+      .toLowerCase()
+      .split(RegExp(r'[\s/&,+-]+'))
+      .where((w) => w.isNotEmpty)
+      .toSet();
+
+  bool has(List<String> keys) => keys.any(words.contains);
+
+  if (has(['meyve', 'meyveler'])) return '🍎';
+  if (has(['sebze', 'sebzeler', 'yeşillik'])) return '🥦';
+  if (has(['süt', 'sütlü', 'kahvaltılık', 'kahvaltı'])) return '🥛';
+  if (has(['et', 'balık', 'tavuk', 'şarküteri', 'kırmızı'])) return '🥩';
+  if (has(['temizlik', 'deterjan'])) return '🧴';
+  if (has(['ekmek', 'fırın', 'unlu', 'pastane'])) return '🍞';
+  if (has(['içecek', 'içecekler', 'meşrubat', 'su'])) return '🥤';
+  if (has(['bebek'])) return '🍼';
+  if (has(['atıştırmalık', 'atıştırmalıklar', 'cips', 'çerez'])) return '🍿';
+  if (has(['dondurulmuş', 'donuk'])) return '🧊';
+  if (has(['bakliyat', 'kuruyemiş', 'kuru'])) return '🫘';
+  if (has(['kişisel', 'bakım', 'kozmetik'])) return '🧼';
+  if (has(['kırtasiye', 'ofis'])) return '✏️';
+  if (has(['elektronik', 'teknoloji'])) return '🔌';
+  if (has(['kıyafet', 'giyim', 'tekstil'])) return '👕';
+  if (has(['ev', 'yaşam', 'züccaciye'])) return '🏠';
+  if (has(['kahve', 'çay'])) return '☕';
+  if (has(['baharat', 'baharatlar'])) return '🧂';
   return '🛒';
 }

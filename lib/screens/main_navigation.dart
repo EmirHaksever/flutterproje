@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'friends_screen.dart';
 import 'notifications_screen.dart';
 import '../constants/categories.dart';
+import '../theme/app_theme.dart';
 import 'home.dart';
 import 'create_list.dart';
 import 'profile.dart';
@@ -30,7 +31,9 @@ class MainNavigationPage extends StatefulWidget {
 }
 
 class _MainNavigationPageState extends State<MainNavigationPage> {
-  int _selectedIndex = 0;
+  /// Görünür sekme indexi: 0=Ana Sayfa, 1=Listeler, 2=AI, 3=Profil.
+  /// (Ortadaki "+" bir sekme değil, sadece Liste Oluştur'u açar.)
+  int _pageIndex = 0;
   String _userName = 'Misafir';
   String _userEmail = '';
 
@@ -44,9 +47,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final swatch = widget.customPrimarySwatch;
     _pages = [
       HomePage(customPrimarySwatch: swatch),
-      StatsPage(customPrimarySwatch: swatch),
-      const AIChatPage(),
       MyListsPage(customPrimarySwatch: swatch),
+      const AIChatPage(),
       const ProfilePage(),
     ];
 
@@ -133,12 +135,33 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     );
   }
 
+  void _openStats() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            StatsPage(customPrimarySwatch: widget.customPrimarySwatch),
+      ),
+    );
+  }
+
   Future<void> _signOut() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('email');
     await prefs.setBool('rememberMe', false);
     await supabase.auth.signOut();
   }
+
+  /// Alt bar tıklama: 0,1 doğrudan sekme; 2 = "+" (Liste Oluştur); 3,4 sekme.
+  void _onNavTap(int i) {
+    if (i == 2) {
+      _openCreateList();
+      return;
+    }
+    setState(() => _pageIndex = i > 2 ? i - 1 : i);
+  }
+
+  int get _selectedNavIndex => _pageIndex >= 2 ? _pageIndex + 1 : _pageIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -147,37 +170,40 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: _buildDrawer(scheme),
-      body: IndexedStack(index: _selectedIndex, children: _pages),
+      body: IndexedStack(index: _pageIndex, children: _pages),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        destinations: const [
-          NavigationDestination(
+        selectedIndex: _selectedNavIndex,
+        onDestinationSelected: _onNavTap,
+        destinations: [
+          const NavigationDestination(
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home_rounded),
               label: 'Ana Sayfa'),
-          NavigationDestination(
-              icon: Icon(Icons.bar_chart_outlined),
-              selectedIcon: Icon(Icons.bar_chart_rounded),
-              label: 'İstatistik'),
-          NavigationDestination(
-              icon: Icon(Icons.psychology_outlined),
-              selectedIcon: Icon(Icons.psychology_rounded),
-              label: 'AI'),
-          NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded),
+          const NavigationDestination(
+              icon: Icon(Icons.checklist_outlined),
+              selectedIcon: Icon(Icons.checklist_rounded),
               label: 'Listeler'),
           NavigationDestination(
+            icon: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.add, color: scheme.onPrimary, size: 26),
+            ),
+            label: '',
+          ),
+          const NavigationDestination(
+              icon: Icon(Icons.auto_awesome_outlined),
+              selectedIcon: Icon(Icons.auto_awesome),
+              label: 'AI'),
+          const NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person_rounded),
               label: 'Profil'),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openCreateList,
-        tooltip: 'Yeni Liste',
-        child: const Icon(Icons.add),
       ),
     );
   }
@@ -188,8 +214,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       return ListTile(
         leading: Icon(icon, color: color ?? scheme.onSurfaceVariant),
         title: Text(label,
-            style: TextStyle(
-                fontWeight: FontWeight.w500, color: color)),
+            style: TextStyle(fontWeight: FontWeight.w500, color: color)),
         onTap: () {
           Navigator.pop(context);
           onTap();
@@ -197,9 +222,9 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       );
     }
 
-    void go(int i) => setState(() => _selectedIndex = i);
-    void push(Widget page) => Navigator.push(
-        context, MaterialPageRoute(builder: (_) => page));
+    void go(int pageIndex) => setState(() => _pageIndex = pageIndex);
+    void push(Widget page) =>
+        Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
     return Drawer(
       child: ListView(
@@ -211,15 +236,15 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             accountEmail: Text(_userEmail),
             currentAccountPicture: CircleAvatar(
-              backgroundColor: scheme.onPrimary,
+              backgroundColor: AppTheme.heroGreenBg,
               child: Icon(Icons.person, color: scheme.primary),
             ),
           ),
           tile(Icons.home_outlined, 'Ana Sayfa', () => go(0)),
-          tile(Icons.bar_chart_outlined, 'İstatistikler', () => go(1)),
-          tile(Icons.psychology_outlined, 'AI Asistanı', () => go(2)),
-          tile(Icons.receipt_long_outlined, 'Listelerim', () => go(3)),
-          tile(Icons.person_outline, 'Profil', () => go(4)),
+          tile(Icons.checklist_outlined, 'Listelerim', () => go(1)),
+          tile(Icons.auto_awesome_outlined, 'AI Asistanı', () => go(2)),
+          tile(Icons.person_outline, 'Profil', () => go(3)),
+          tile(Icons.bar_chart_outlined, 'İstatistikler', _openStats),
           const Divider(),
           tile(Icons.group_outlined, 'Arkadaşlar',
               () => push(const FriendsScreen())),
