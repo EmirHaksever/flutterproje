@@ -868,118 +868,31 @@ class _ListDetailPageState extends State<ListDetailPage> {
     }
   }
 
-  Widget buildSharedListInfoSection(MaterialColor themePrimaryColor) {
-    final bool isOwner = widget.listData['user_id'] == currentUserId;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.person_outline, size: 20, color: themePrimaryColor),
-              const SizedBox(width: 8),
-              Text("Liste Sahibi:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Theme.of(context).colorScheme.onSurface)),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 28.0),
-            child: Text(
-              listOwnerEmail,
-              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.group_outlined, size: 20, color: themePrimaryColor),
-              const SizedBox(width: 8),
-              Text("Paylaşılan Kullanıcılar:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Theme.of(context).colorScheme.onSurface)),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 28.0),
-            child: _sharedEmails.isEmpty
-                ? Text('Bu liste henüz kimseyle paylaşılmadı.', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant))
-                : Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: _sharedEmails.map((email) => Chip(
-                      label: Text(
-                        email,
-                        style: TextStyle(color: themePrimaryColor.shade700, fontSize: 12),
-                        overflow: TextOverflow.ellipsis, // Added to prevent overflow
-                      ),
-                      backgroundColor: themePrimaryColor.shade50,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      side: BorderSide(color: themePrimaryColor.shade200),
-                    )).toList(),
-                  ),
-          ),
-          if (!isOwner) // If not owner, show who shared this list
-            Padding(
-              padding: const EdgeInsets.only(top: 12.0),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 5),
-                  Text(
-                    'Bu liste sizinle "$listOwnerEmail" tarafından paylaşıldı.',
-                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    // customPrimarySwatch'i burada kullanabiliriz
-    final MaterialColor primaryColor = (Theme.of(context).primaryColor is MaterialColor)
-        ? (Theme.of(context).primaryColor as MaterialColor)
-        : Colors.teal;
+    final scheme = Theme.of(context).colorScheme;
+    final isOwner = widget.listData['user_id'] == currentUserId;
+    final rate = _completionRate();
+    final done = _items.where((i) => i['is_completed'] == true).length;
 
-    final bool isOwner = widget.listData['user_id'] == currentUserId;
-
-    final createdAt = DateTime.tryParse(widget.listData['created_at'] ?? '');
-    final String listMarketName = widget.listData['market'] ?? 'Bilinmiyor'; // Mağaza bilgisini al
-    final String listCategoryName = widget.listData['category'] ?? 'Genel'; // Kategori bilgisini al
-
-    // Tamamlanma oranını her build çağrısında yeniden hesapla (veya _listCompletionChannel'dan gelenle UI'ı tetikle)
-    final double currentCompletionRate = _completionRate();
-    debugPrint('list_detail: Current completion rate for UI: ${currentCompletionRate * 100}% at build time.');
-
+    final visible = _visibleItems;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Daha açık arka plan
       appBar: AppBar(
         title: Text(
-          widget.listData['name'] ?? 'Liste Detayı',
+          widget.listData['name'] ?? 'Liste',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           if (isOwner)
             IconButton(
-              icon: const Icon(Icons.share_outlined),
-              tooltip: 'Listeyi Paylaş',
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              tooltip: 'Paylaş',
               onPressed: _showShareDialog,
             ),
           if (isOwner)
@@ -991,344 +904,320 @@ class _ListDetailPageState extends State<ListDetailPage> {
           if (isOwner || _isChanged)
             IconButton(
               icon: Icon(_isChanged ? Icons.save : Icons.save_alt_outlined),
-              tooltip: 'Değişiklikleri Kaydet',
+              tooltip: 'Kaydet',
               onPressed: _showSaveChangesDialog,
             ),
         ],
       ),
-      body: SingleChildScrollView( // Wrapped with SingleChildScrollView to prevent bottom overflow
-        padding: const EdgeInsets.symmetric(horizontal: 16), // Sadece yatay dolgu bırakıldı
-        child: Column(
+      floatingActionButton: isOwner
+          ? FloatingActionButton.extended(
+              heroTag: 'listDetailAddFab',
+              onPressed: _addNewItemDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Ürün ekle'),
+            )
+          : null,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        children: [
+          _progressCard(scheme, rate, done),
+          if (_sharedEmails.isNotEmpty || !isOwner) ...[
+            const SizedBox(height: 12),
+            _sharedCard(scheme),
+          ],
+          const SizedBox(height: 16),
+          _filterBar(scheme),
+          const SizedBox(height: 12),
+          if (visible.isEmpty)
+            _emptyItems(scheme)
+          else
+            ...visible.map((item) => _itemTile(scheme, item, isOwner)),
+        ],
+      ),
+    );
+  }
+
+  Widget _progressCard(ColorScheme scheme, double rate, int done) {
+    final pct = (rate * 100).round();
+    String created = '';
+    try {
+      created = DateFormat('dd MMMM yyyy', 'tr_TR')
+          .format(DateTime.parse(widget.listData['created_at']));
+    } catch (_) {}
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            scheme.primary,
+            Color.lerp(scheme.primary, Colors.black, 0.3)!
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('%$pct',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('$done / ${_items.length} ürün alındı',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: rate,
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.25),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          if (created.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.calendar_today,
+                    size: 13, color: Colors.white.withValues(alpha: 0.85)),
+                const SizedBox(width: 6),
+                Text(created,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 12)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _sharedCard(ColorScheme scheme) {
+    final people = <String>[
+      if (listOwnerEmail.isNotEmpty && listOwnerEmail != 'Bilinmiyor')
+        listOwnerEmail,
+      ..._sharedEmails,
+    ];
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border:
+            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.group_outlined, size: 18, color: scheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              people.isEmpty
+                  ? 'Bu liste kimseyle paylaşılmadı.'
+                  : people.join(', '),
+              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterBar(ColorScheme scheme) {
+    final markets =
+        _availableMarkets.where((m) => m != 'Tümü').toList();
+    final categories = _items
+        .map((i) => i['category'] as String?)
+        .whereType<String>()
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Ürünler (${_items.length})',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: scheme.onSurface)),
+            Row(
+              children: [
+                Text('Tamamlananları gizle',
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+                Switch(
+                  value: _hideCompleted,
+                  onChanged: (v) => setState(() => _hideCompleted = v),
+                ),
+              ],
+            ),
+          ],
+        ),
+        if (markets.isNotEmpty || categories.isNotEmpty)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final c in categories)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(c),
+                      selected: _selectedCategoryFilter == c,
+                      onSelected: (s) => setState(() =>
+                          _selectedCategoryFilter = s ? c : null),
+                    ),
+                  ),
+                for (final m in markets)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      avatar: const Icon(Icons.storefront, size: 16),
+                      label: Text(m),
+                      selected: _selectedMarketFilter == m,
+                      onSelected: (s) => setState(
+                          () => _selectedMarketFilter = s ? m : null),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _emptyItems(ColorScheme scheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.shopping_cart_outlined,
+              size: 44, color: scheme.primary),
+          const SizedBox(height: 10),
+          Text(
+            _items.isEmpty
+                ? 'Bu listede henüz ürün yok.'
+                : 'Filtreye uyan ürün yok.',
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itemTile(
+      ColorScheme scheme, Map<String, dynamic> item, bool isOwner) {
+    final realIndex = _items.indexOf(item);
+    final completed = item['is_completed'] == true;
+    final quantity = item['quantity'] ?? 1;
+    final market = item['market'] as String?;
+    final category = item['category'] as String?;
+    final tags = (item['tags'] as List?)?.cast<String>() ?? const [];
+
+    final meta = [
+      'x$quantity',
+      if (category != null && category.isNotEmpty) category,
+      if (market != null && market.isNotEmpty) market,
+    ].join(' • ');
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // İlk boşluk kaldırıldı çünkü AppBar'ın varsayılan boşluğu yeterli
-            // const SizedBox(height: 16), // Bu boşluk kaldırıldı
-            
-            // Liste Genel Bilgileri Kartı
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: primaryColor.shade50, // Açık tonu
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
+            Checkbox(
+              value: completed,
+              onChanged: (isOwner || !completed)
+                  ? (_) => _toggleItemComplete(realIndex)
+                  : null,
+            ),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 18, color: primaryColor.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Oluşturulma Tarihi: ${createdAt != null ? DateFormat('dd MMMEEEE', 'tr_TR').format(createdAt) : 'Bilinmiyor'}',
-                        style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.storefront, size: 18, color: primaryColor.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Liste Mağazası: $listMarketName', // Mağaza bilgisini göster
-                        style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                   Row(
-                    children: [
-                      Icon(Icons.category, size: 18, color: primaryColor.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Liste Kategorisi: $listCategoryName', // Kategori bilgisini göster
-                        style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                   Text(
-                    'Tamamlanma Oranı: %${(currentCompletionRate * 100).round()}', // Yeni değer
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: currentCompletionRate, // Yeni değer
-                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      color: primaryColor, // Ana renk
-                      minHeight: 12,
+                    item['product_name'] ?? '',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      decoration:
+                          completed ? TextDecoration.lineThrough : null,
+                      color: completed
+                          ? scheme.onSurfaceVariant
+                          : scheme.onSurface,
                     ),
                   ),
-                ],
-              ),
-            ),
-            
-            // Sahip ve Paylaşılanlar Bilgisi (ayrı bir kartta)
-            buildSharedListInfoSection(primaryColor),
-
-            const SizedBox(height: 16),
-            // Tamamlananları Gizle Seçeneği
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Tamamlanan Ürünleri Gizle',
-                    style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
-                  ),
-                  Switch.adaptive( // Platforma uygun switch
-                    value: _hideCompleted,
-                    onChanged: (v) => setState(() => _hideCompleted = v),
-                    activeColor: primaryColor,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16), // Filtreleme alanı ile ürün başlığı arasına boşluk
-
-            // Filtering Section for Items
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Filtreleme Seçenekleri', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton2<String>(
-                            isExpanded: true,
-                            hint: Text(
-                              'Mağazaya Göre Filtrele',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context).hintColor,
-                              ),
-                            ),
-                            items: _availableMarkets.map((market) =>
-                                DropdownMenuItem(value: market, child: Text(market))).toList(),
-                            value: _selectedMarketFilter,
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedMarketFilter = value;
-                              });
-                            },
-                            buttonStyleData: ButtonStyleData(
-                              padding: const EdgeInsets.only(left: 14, right: 14),
-                              height: 40,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.black26),
-                                color: Colors.white,
-                              ),
-                            ),
-                            menuItemStyleData: const MenuItemStyleData(
-                              height: 40,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton2<String>(
-                            isExpanded: true,
-                            hint: Text(
-                              'Kategoriye Göre Filtrele',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context).hintColor,
-                              ),
-                            ),
-                            // Filtreleme için önceden tanımlı kategorileri kullan
-                            items: _predefinedCategories.map((category) =>
-                                DropdownMenuItem(value: category, child: Text(category))).toList(),
-                            value: _selectedCategoryFilter,
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedCategoryFilter = value;
-                              });
-                            },
-                            buttonStyleData: ButtonStyleData(
-                              padding: const EdgeInsets.only(left: 14, right: 14),
-                              height: 40,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.black26),
-                                color: Colors.white,
-                              ),
-                            ),
-                            menuItemStyleData: const MenuItemStyleData(
-                              height: 40,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Products List Title
-            Text(
-              'Alışveriş Listesi Ürünleri',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-            ),
-            const SizedBox(height: 12),
-
-            ListView.builder(
-              shrinkWrap: true, // Crucial for ListView inside SingleChildScrollView
-              physics: const NeverScrollableScrollPhysics(), // Prevents nested scrolling
-              itemCount: _visibleItems.length,
-              itemBuilder: (context, index) {
-                final item = _visibleItems[index];
-                final realIndex = _items.indexOf(item); // Original index in _items
-                final quantity = item['quantity'] ?? 1;
-                final market = item['market'] as String?;
-                final category = item['category'] as String?;
-                final tags = item['tags'] as List?; // Tags are stored as a List
-
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16), // Added more padding
-                    leading: Checkbox(
-                      value: item['is_completed'],
-                      onChanged: (isOwner || !item['is_completed']) // Sadece sahibi ise veya tamamlanmamışsa değiştirilebilir
-                          ? (_) => _toggleItemComplete(realIndex)
-                          : null, // Değiştirilemez ise null
-                      activeColor: primaryColor,
-                    ),
-                    title: Text(
-                      item['product_name'] ?? '',
+                  const SizedBox(height: 2),
+                  Text(meta,
                       style: TextStyle(
-                        fontSize: 17, // Slightly larger font
-                        fontWeight: FontWeight.w600, // Slightly bolder
-                        decoration: item['is_completed'] ? TextDecoration.lineThrough : TextDecoration.none,
-                        color: item['is_completed'] ? Theme.of(context).colorScheme.onSurfaceVariant : Theme.of(context).colorScheme.onSurface, // Faded for completed
+                          fontSize: 12, color: scheme.onSurfaceVariant)),
+                  if (tags.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: tags
+                            .map((t) => Chip(
+                                  label: Text(t,
+                                      style: const TextStyle(fontSize: 10)),
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  padding: EdgeInsets.zero,
+                                ))
+                            .toList(),
                       ),
                     ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Miktar: $quantity',
-                            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
-                          ),
-                          if (market != null && market.isNotEmpty)
-                            Text(
-                              'Mağaza: $market',
-                              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            ),
-                          if (category != null && category.isNotEmpty)
-                            Text(
-                              'Kategori: $category',
-                              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            ),
-                          if (tags != null && tags.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6.0), // More space above tags
-                              child: Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: tags.map((tag) => Chip(
-                                  label: Text(tag, style: TextStyle(fontSize: 10, color: primaryColor.shade800)),
-                                  backgroundColor: primaryColor.shade100,
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0), // Smaller padding
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  side: BorderSide(color: primaryColor.shade300),
-                                )).toList(),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    trailing: isOwner
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.edit_outlined,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                tooltip: 'Düzenle',
-                                onPressed: () => _editItemDialog(realIndex),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_rounded,
-                                    color: Colors.red),
-                                tooltip: 'Sil',
-                                onPressed: () => _deleteItem(realIndex),
-                              ),
-                            ],
-                          )
-                        : null,
-                  ),
-                );
-              },
+                ],
+              ),
             ),
-            // The Elevated Button for adding new item.
-            if (isOwner && _visibleItems.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 20.0),
-                child: ElevatedButton.icon(
-                  onPressed: _addNewItemDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Yeni Ürün Ekle'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              )
-            else if (!isOwner && _visibleItems.isEmpty)
-              const SizedBox(height: 20),
+            if (isOwner) ...[
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.edit_outlined,
+                    size: 20, color: scheme.onSurfaceVariant),
+                tooltip: 'Düzenle',
+                onPressed: () => _editItemDialog(realIndex),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.delete_outline,
+                    size: 20, color: scheme.error),
+                tooltip: 'Sil',
+                onPressed: () => _deleteItem(realIndex),
+              ),
+            ],
           ],
         ),
       ),
