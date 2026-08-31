@@ -329,15 +329,27 @@ class _ProfilePageState extends State<ProfilePage> {
       onTap: _uploadingAvatar ? null : _pickAndUploadAvatar,
       child: Stack(
         children: [
-          CircleAvatar(
-            radius: 48,
-            backgroundColor: AppTheme.heroGreenBg,
-            backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                ? NetworkImage(_avatarUrl!)
-                : null,
-            child: (_avatarUrl == null || _avatarUrl!.isEmpty)
-                ? Icon(Icons.person, size: 52, color: scheme.primary)
-                : null,
+          Container(
+            width: 96,
+            height: 96,
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: AppTheme.heroGreenBg,
+              shape: BoxShape.circle,
+            ),
+            child: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                ? Image.network(
+                    _avatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(Icons.person,
+                        size: 52, color: scheme.primary),
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null
+                            ? child
+                            : Icon(Icons.person,
+                                size: 52, color: scheme.primary),
+                  )
+                : Icon(Icons.person, size: 52, color: scheme.primary),
           ),
           Positioned(
             right: 0,
