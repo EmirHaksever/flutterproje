@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repositories/image_repository.dart';
 import '../repositories/user_repository.dart';
+import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import 'friends_screen.dart';
 import 'notifications_screen.dart';
@@ -163,6 +164,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _signOut() async {
     try {
+      await PushService.instance.clearOnLogout();
       await supabase.auth.signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('email');

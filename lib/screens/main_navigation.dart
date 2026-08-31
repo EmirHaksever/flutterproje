@@ -1,3 +1,6 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'friends_screen.dart';
 import 'notifications_screen.dart';
 import '../constants/categories.dart';
+import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import 'home.dart';
 import 'create_list.dart';
@@ -58,6 +62,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
 
     _fetchUserProfile();
     _fetchAllAvailableCategories();
+    _initPush();
 
     supabase.auth.onAuthStateChange.listen((data) {
       if (!mounted) return;
@@ -150,10 +155,27 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   }
 
   Future<void> _signOut() async {
+    await PushService.instance.clearOnLogout();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('email');
     await prefs.setBool('rememberMe', false);
     await supabase.auth.signOut();
+  }
+
+  void _initPush() {
+    PushService.instance.start();
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    // Bildirime dokununca (arka plan / kapalıyken) Bildirimler'e git.
+    FirebaseMessaging.onMessageOpenedApp.listen((_) => _openNotifications());
+    FirebaseMessaging.instance.getInitialMessage().then((m) {
+      if (m != null) _openNotifications();
+    });
+  }
+
+  void _openNotifications() {
+    if (!mounted) return;
+    Navigator.push(context,
+        MaterialPageRoute(builder: (_) => const NotificationsScreen()));
   }
 
   /// Alt bar tıklama: 0,1 doğrudan sekme; 2 = "+" (Liste Oluştur); 3,4 sekme.

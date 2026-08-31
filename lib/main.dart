@@ -1,3 +1,7 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,11 +17,27 @@ import 'screens/settings.dart';
 import 'screens/main_navigation.dart';
 import 'screens/ai_chat.dart';
 
+/// FCM arka plan mesajı işleyici — üst seviye fonksiyon olmak zorunda.
+@pragma('vm:entry-point')
+Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
+  // Sistem tepsisindeki bildirimi FCM otomatik gösterir; burada iş yapmıyoruz.
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // .env dosyasını yükle (GEMINI_API_KEY vb. burada okunur).
   await dotenv.load(fileName: ".env");
+
+  // Push bildirim yalnızca Android'de.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+    } catch (e) {
+      debugPrint('Firebase init hata: $e');
+    }
+  }
 
   await Future.wait([
     Supabase.initialize(
