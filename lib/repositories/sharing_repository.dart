@@ -11,53 +11,30 @@ class SharingRepository {
 
   final SupabaseClient _client;
 
-  String get _uid {
-    final id = _client.auth.currentUser?.id;
-    if (id == null) throw StateError('Oturum yok.');
-    return id;
-  }
-
-  /// Sonuç kodları: paylaşımın nasıl sonuçlandığını çağırana anlatır.
-  /// UI, kullanıcıya gösterilecek metni buna göre seçer.
-  ShareOutcome _ok() => ShareOutcome.success;
-
   /// Bir listeyi e-posta ile paylaşır.
+  ///
+  /// Asıl iş veritabanındaki `share_list_by_email` fonksiyonunda yapılır
+  /// (SECURITY DEFINER): sahiplik kontrolü, kullanıcı arama, çift-paylaşım
+  /// kontrolü ve karşı tarafa bildirim — hepsi atomik ve baypas edilemez.
   Future<ShareOutcome> shareByEmail({
     required String listId,
     required String email,
   }) async {
     final normalized = email.trim().toLowerCase();
-    final myEmail = _client.auth.currentUser?.email?.toLowerCase();
     if (normalized.isEmpty || !normalized.contains('@')) {
       return ShareOutcome.invalidEmail;
     }
-    if (normalized == myEmail) return ShareOutcome.self;
 
-    final targetUser = await _client
-        .from('users')
-        .select('id')
-        .eq('email', normalized)
-        .maybeSingle();
-    if (targetUser == null) return ShareOutcome.userNotFound;
+    final result = await _client.rpc('share_list_by_email',
+        params: {'p_list_id': listId, 'p_email': normalized});
 
-    final targetId = targetUser['id'] as String;
-
-    final existing = await _client
-        .from('shared_lists')
-        .select('id')
-        .eq('list_id', listId)
-        .eq('user_id', targetId)
-        .maybeSingle();
-    if (existing != null) return ShareOutcome.alreadyShared;
-
-    await _client.from('shared_lists').insert({
-      'list_id': listId,
-      'user_id': targetId,
-      'user_email': normalized,
-      'role': 'editor',
-      'shared_by_user_id': _uid,
-    });
-    return _ok();
+    return switch (result) {
+      'ok' => ShareOutcome.success,
+      'self' => ShareOutcome.self,
+      'not_found' => ShareOutcome.userNotFound,
+      'already' => ShareOutcome.alreadyShared,
+      _ => ShareOutcome.success,
+    };
   }
 
   /// Bir listenin paylaşıldığı kullanıcıların e-postaları.

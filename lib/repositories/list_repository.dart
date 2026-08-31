@@ -122,6 +122,25 @@ class ListRepository {
         .update({'is_completed': completed}).eq('id', itemId);
   }
 
+  /// Bir ürünün alanlarını günceller. Yalnızca verilen anahtarlar değişir.
+  Future<void> updateItem(
+    String itemId, {
+    String? productName,
+    int? quantity,
+    String? category,
+    String? market,
+    List<String>? tags,
+  }) async {
+    final patch = <String, dynamic>{};
+    if (productName != null) patch['product_name'] = productName;
+    if (quantity != null) patch['quantity'] = quantity;
+    if (category != null) patch['category'] = category;
+    if (market != null) patch['market'] = market;
+    if (tags != null) patch['tags'] = tags;
+    if (patch.isEmpty) return;
+    await _client.from('list_items').update(patch).eq('id', itemId);
+  }
+
   Future<void> deleteItem(String itemId) async {
     await _client.from('list_items').delete().eq('id', itemId);
   }

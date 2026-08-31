@@ -4,6 +4,9 @@ import 'dart:async';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:dropdown_button2/dropdown_button2.dart'; // For enhanced dropdowns
 
+import '../repositories/list_repository.dart';
+import '../repositories/sharing_repository.dart';
+
 class ListDetailPage extends StatefulWidget {
   final Map<String, dynamic> listData;
 
@@ -15,6 +18,8 @@ class ListDetailPage extends StatefulWidget {
 
 class _ListDetailPageState extends State<ListDetailPage> {
   final supabase = Supabase.instance.client;
+  final ListRepository _listRepo = ListRepository();
+  final SharingRepository _sharingRepo = SharingRepository();
   late String currentUserId;
   String listOwnerEmail = '';
   List<Map<String, dynamic>> _items = [];
@@ -277,55 +282,18 @@ class _ListDetailPageState extends State<ListDetailPage> {
     }
   }
 
-  // Yeni: Listeye erişimi olan tüm kullanıcıların ID'lerini getiren yardımcı fonksiyon
-  Future<Set<String>> _getUsersForListNotification(String listId) async {
-    Set<String> userIds = {};
-
-    // Liste sahibinin ID'sini al
-    final ownerResponse = await supabase
-        .from('shopping_lists')
-        .select('user_id')
-        .eq('id', listId)
-        .maybeSingle();
-    if (ownerResponse != null && ownerResponse['user_id'] != null) {
-      userIds.add(ownerResponse['user_id'] as String);
-    }
-
-    // Paylaşılan kullanıcıların ID'lerini al
-    final sharedUsersResponse = await supabase
-        .from('shared_lists')
-        .select('user_id')
-        .eq('list_id', listId);
-    
-    for (var record in sharedUsersResponse) {
-      if (record['user_id'] != null) {
-        userIds.add(record['user_id'] as String);
-      }
-    }
-    return userIds;
-  }
-
-  // Yeni: Değişiklik bildirimini ilgili kullanıcılara gönderen fonksiyon
-  Future<void> _sendChangeNotification(String listId, String changeMessage, String currentUserPerformingActionId) async {
-    final allRelatedUserIds = await _getUsersForListNotification(listId);
-    final String listName = widget.listData['name'] ?? 'Alışveriş Listesi';
-
-    for (String userIdToNotify in allRelatedUserIds) {
-      // Değişikliği yapan kullanıcıya bildirim gönderme
-      if (userIdToNotify == currentUserPerformingActionId) {
-        continue;
-      }
-      try {
-        await supabase.from('notifications').insert({
-          'user_id': userIdToNotify,
-          'message': '"$listName" listenizde $changeMessage',
-          'is_read': false,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        debugPrint('Notification sent to $userIdToNotify: "$listName" listenizde $changeMessage');
-      } catch (e) {
-        debugPrint('Failed to send notification to $userIdToNotify: $e');
-      }
+  /// Listedeki diğer katılımcılara bildirim yazar. İş sunucudaki
+  /// `notify_list_participants` fonksiyonunda yapılır (erişim kontrolü +
+  /// çağıran hariç herkese insert). Başarısızlık sessizce yutulur.
+  Future<void> _notifyParticipants(String changeMessage) async {
+    final listName = widget.listData['name'] ?? 'Alışveriş Listesi';
+    try {
+      await supabase.rpc('notify_list_participants', params: {
+        'p_list_id': widget.listData['id'],
+        'p_message': '"$listName" listende $changeMessage',
+      });
+    } catch (e) {
+      debugPrint('Bildirim gönderilemedi: $e');
     }
   }
 
@@ -354,7 +322,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
 
       // Bildirim gönder
       final String notificationMessage = updatedStatus ? '$productName tamamlandı.' : '$productName tamamlanmadı olarak işaretlendi.';
-      await _sendChangeNotification(widget.listData['id'], notificationMessage, currentUserId);
+      await _notifyParticipants(notificationMessage);
 
     } catch (e) {
       // Hata durumunda eski durumu geri al
@@ -420,7 +388,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
         );
       }
       // Bildirim gönder
-      await _sendChangeNotification(widget.listData['id'], '$productName silindi.', currentUserId);
+      await _notifyParticipants('$productName silindi.');
 
     } catch (e) {
       // Hata durumunda geri al
@@ -468,6 +436,98 @@ class _ListDetailPageState extends State<ListDetailPage> {
           _selectedCategoryFilter!.toLowerCase());
     }
     return filteredItems.toList();
+  }
+
+  Future<void> _editItemDialog(int index) async {
+    final item = _items[index];
+    final nameCtrl =
+        TextEditingController(text: (item['product_name'] ?? '') as String);
+    final qtyCtrl =
+        TextEditingController(text: '${item['quantity'] ?? 1}');
+    final marketCtrl =
+        TextEditingController(text: (item['market'] ?? '') as String);
+    final tagsCtrl = TextEditingController(
+        text: (item['tags'] is List)
+            ? (item['tags'] as List).join(', ')
+            : '');
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ürünü düzenle'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Ürün adı'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Miktar'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: marketCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Mağaza (opsiyonel)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: tagsCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Etiketler (virgülle ayır)'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Kaydet')),
+        ],
+      ),
+    );
+    if (saved != true) return;
+
+    final name = nameCtrl.text.trim();
+    if (name.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ürün adı boş olamaz.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      await _listRepo.updateItem(
+        item['id'] as String,
+        productName: name,
+        quantity: int.tryParse(qtyCtrl.text.trim()) ?? 1,
+        market: marketCtrl.text.trim(),
+        tags: tagsCtrl.text
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+      );
+      await _fetchItems();
+      await _notifyParticipants('"$name" güncellendi.');
+    } catch (e) {
+      debugPrint('Ürün güncellenemedi: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ürün güncellenemedi.')),
+        );
+      }
+    }
   }
 
   Future<void> _addNewItemDialog() async {
@@ -620,7 +680,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                   await _updateCompletionRate(); // Update rate after new item added
                 }
                 // Bildirim gönder
-                await _sendChangeNotification(widget.listData['id'], '"$name" adlı yeni bir ürün eklendi.', currentUserId);
+                await _notifyParticipants('"$name" adlı yeni bir ürün eklendi.');
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -642,156 +702,68 @@ class _ListDetailPageState extends State<ListDetailPage> {
   }
 
   Future<void> _showShareDialog() async {
-    final TextEditingController sharedUserIdController = TextEditingController(); // Değiştirildi
-    bool isLoading = false;
-
-    await showDialog(
+    final emailController = TextEditingController();
+    final email = await showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            title: const Text('Listeyi Paylaş', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: sharedUserIdController, // sharedUserIdController kullanıldı
-                  decoration: InputDecoration(
-                    labelText: 'Kullanıcı ID\'si', // Değiştirildi
-                    hintText: 'Paylaşmak istediğiniz kullanıcının ID\'sini girin', // Değiştirildi
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (isLoading) const CircularProgressIndicator(),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('İptal', style: TextStyle(color: Colors.grey)),
-              ),
-              ElevatedButton(
-                onPressed: isLoading
-                    ? null
-                    : () async {
-                        final String sharedUserId = sharedUserIdController.text.trim(); // sharedUserIdController kullanıldı
-                        if (sharedUserId.isEmpty) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Kullanıcı ID\'si boş olamaz!')),
-                            );
-                          }
-                          return;
-                        }
-
-                        setState(() => isLoading = true);
-
-                        try {
-                          // Doğrudan kullanıcı ID'si ile kullanıcının varlığını doğrula
-                          final userRes = await supabase
-                              .from('users')
-                              .select('id')
-                              .eq('id', sharedUserId) // ID ile sorgula
-                              .maybeSingle()
-                              .timeout(const Duration(seconds: 10));
-
-                          if (userRes == null) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Paylaşmak istediğiniz kullanıcı bulunamadı'),
-                                ),
-                              );
-                            }
-                            setState(() => isLoading = false);
-                            return;
-                          }
-
-                          final toUserId = userRes['id'] as String; // Zaten ID'yi aldık
-
-                          final existingShare = await supabase
-                              .from('shared_lists')
-                              .select()
-                              .eq('list_id', widget.listData['id'])
-                              .eq('user_id', toUserId)
-                              .maybeSingle();
-
-                          if (existingShare != null) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Bu liste zaten bu kullanıcıyla paylaşılmış')),
-                              );
-                            }
-                            setState(() => isLoading = false);
-                            return;
-                          }
-
-                          await supabase.from('shared_lists').insert({
-                            'list_id': widget.listData['id'],
-                            'user_id': toUserId,
-                            'role': 'editor', // Adjust according to your Supabase schema
-                            'created_at': DateTime.now().toIso8601String(),
-                            'shared_by_user_id': currentUserId, // Sharing user ID
-                          });
-
-                          await sendShareNotification(
-                              toUserId, widget.listData['name'] ?? 'Liste');
-
-                          await _fetchSharedUsers(); // Update shared users
-
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Liste başarıyla paylaşıldı!')),
-                            );
-                            Navigator.pop(context); // Close dialog
-                          }
-                        } on PostgrestException catch (e) {
-                          debugPrint('Paylaşım hatası (PostgrestException): ${e.message}');
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Hata oluştu: ${e.message}')),
-                            );
-                          }
-                        } catch (e) {
-                          debugPrint('Hata oluştu: $e');
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Beklenmedik bir hata oluştu: $e')),
-                            );
-                          }
-                        } finally {
-                          setState(() => isLoading = false);
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Paylaş'),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('Listeyi Paylaş',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: emailController,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: 'Kullanıcının e-posta adresi',
+            hintText: 'ornek@email.com',
+            prefixIcon: const Icon(Icons.alternate_email),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           ),
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, emailController.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Paylaş'),
+          ),
+        ],
+      ),
     );
-  }
+    if (email == null || email.isEmpty) return;
 
-  Future<void> sendShareNotification(String toUserId, String listName) async {
     try {
-      await supabase.from('notifications').insert({
-        'user_id': toUserId,
-        'message': '“$listName” adlı alışveriş listesi sizinle paylaşıldı!',
-        'is_read': false,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      final outcome = await _sharingRepo.shareByEmail(
+          listId: widget.listData['id'] as String, email: email);
+      if (!mounted) return;
+
+      final (text, ok) = switch (outcome) {
+        ShareOutcome.success => ('Liste paylaşıldı.', true),
+        ShareOutcome.invalidEmail => ('Geçerli bir e-posta girin.', false),
+        ShareOutcome.self =>
+          ('Kendi listeni kendinle paylaşamazsın.', false),
+        ShareOutcome.userNotFound =>
+          ('Bu e-posta ile kayıtlı kullanıcı yok.', false),
+        ShareOutcome.alreadyShared =>
+          ('Bu liste zaten bu kullanıcıyla paylaşılmış.', false),
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(text),
+        backgroundColor: ok ? Colors.green : Colors.red.shade400,
+      ));
+      if (ok) await _fetchSharedUsers();
     } catch (e) {
-      debugPrint('Bildirim gönderilemedi: $e');
+      debugPrint('Paylaşım hatası: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Liste paylaşılırken bir hata oluştu.')),
+        );
+      }
     }
   }
 
@@ -824,35 +796,20 @@ class _ListDetailPageState extends State<ListDetailPage> {
     if (!confirmDelete) return;
 
     try {
-      // First delete associated list_items
-      await supabase
-          .from('list_items')
-          .delete()
-          .eq('list_id', widget.listData['id']);
-
-      // Then delete shared_lists records
-      await supabase
-          .from('shared_lists')
-          .delete()
-          .eq('list_id', widget.listData['id']);
-
-      // Finally delete the shopping list
-      await supabase
-          .from('shopping_lists')
-          .delete()
-          .eq('id', widget.listData['id']);
+      // list_items + shared_lists, ON DELETE CASCADE ile bağlı: tek silme yeter.
+      await _listRepo.deleteList(widget.listData['id'] as String);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Liste ve tüm ilişkili veriler başarıyla silindi!')),
+          const SnackBar(content: Text('Liste silindi.')),
         );
-        Navigator.pop(context); // Go back to lists page
+        Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('Liste silinirken hata: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Liste silinirken bir hata oluştu: $e')),
+          const SnackBar(content: Text('Liste silinirken bir hata oluştu.')),
         );
       }
     }
@@ -1334,9 +1291,22 @@ class _ListDetailPageState extends State<ListDetailPage> {
                       ),
                     ),
                     trailing: isOwner
-                        ? IconButton(
-                            icon: const Icon(Icons.delete_rounded, color: Colors.red),
-                            onPressed: () => _deleteItem(realIndex),
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit_outlined,
+                                    color: Colors.grey.shade600),
+                                tooltip: 'Düzenle',
+                                onPressed: () => _editItemDialog(realIndex),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_rounded,
+                                    color: Colors.red),
+                                tooltip: 'Sil',
+                                onPressed: () => _deleteItem(realIndex),
+                              ),
+                            ],
                           )
                         : null,
                   ),
