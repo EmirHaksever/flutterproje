@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../repositories/user_repository.dart';
+
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -11,8 +13,10 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final supabase = Supabase.instance.client;
+  final UserRepository _userRepo = UserRepository();
   User? _currentUser;
   String? _userEmail;
+  String? _userName;
   bool _isLoading = false;
 
   @override
@@ -29,18 +33,8 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       _currentUser = supabase.auth.currentUser;
       _userEmail = _currentUser?.email;
-
-      // Opsiyonel: Eğer public.users tablonuzda ek profil bilgileri varsa buradan çekebilirsiniz
-      // final response = await supabase
-      //     .from('users') // 'public.users' tablonuzun adını doğru yazdığınızdan emin olun
-      //     .select('*')
-      //     .eq('id', _currentUser!.id)
-      //     .single();
-      // if (mounted) {
-      //   setState(() {
-      //     // Örneğin: _userName = response['name'];
-      //   });
-      // }
+      _userName = await _userRepo.fetchMyName();
+      if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -93,6 +87,51 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _editName() async {
+    final controller = TextEditingController(text: _userName ?? '');
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Adını düzenle'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Ad',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+    if (newName == null || newName.isEmpty || newName == _userName) return;
+
+    try {
+      await _userRepo.updateName(newName);
+      if (mounted) {
+        setState(() => _userName = newName);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Adın güncellendi.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ad güncellenemedi.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
@@ -127,14 +166,33 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Kullanıcı Adı/E-posta
+                  // Ad + düzenle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          (_userName?.trim().isNotEmpty ?? false)
+                              ? _userName!
+                              : 'İsimsiz',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.edit_outlined,
+                            size: 20, color: primaryColor),
+                        tooltip: 'Adı düzenle',
+                        onPressed: _editName,
+                      ),
+                    ],
+                  ),
                   Text(
                     _userEmail ?? 'Misafir Kullanıcı',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
-                    ),
+                    style: TextStyle(fontSize: 15, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 30),
 

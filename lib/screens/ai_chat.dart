@@ -210,15 +210,19 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
       _scrollToBottom();
       await saveMessage('ai', systemResponse);
     } catch (e) {
-      final error = 'Hata: ${e.toString()}. Lütfen tekrar deneyin.';
-      setState(() {
-        messages.add({'role': 'ai', 'text': error});
-      });
-      _scrollToBottom();
-      await saveMessage('ai', error);
+      _showError(e);
     } finally {
       setState(() => isLoading = false);
     }
+  }
+
+  /// Hatayı geçici bir SnackBar ile gösterir; sohbet geçmişine KAYDETMEZ.
+  void _showError(Object e) {
+    if (!mounted) return;
+    final msg = e.toString().replaceFirst('Exception: ', '');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade400),
+    );
   }
 
   Future<void> sendMessage(String userMessage) async {
@@ -265,12 +269,7 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
       _scrollToBottom();
       await saveMessage('ai', aiResponse);
     } catch (e) {
-      final error = 'Hata: ${e.toString()}. Mesajınız gönderilemedi. Lütfen internet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.';
-      setState(() {
-        messages.add({'role': 'ai', 'text': error});
-      });
-      _scrollToBottom();
-      await saveMessage('ai', error);
+      _showError(e);
     } finally {
       setState(() {
         isLoading = false;
