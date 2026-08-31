@@ -339,7 +339,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
     setState(() {
       _items[index]['is_completed'] = updatedStatus;
       _isChanged = true;
-      debugPrint('list_detail: Optimistically updated item "${productName}" to completed: $updatedStatus.');
+      debugPrint('list_detail: Optimistically updated item "$productName" to completed: $updatedStatus.');
     });
 
     try {
@@ -347,7 +347,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
           .from('list_items')
           .update({'is_completed': updatedStatus})
           .eq('id', item['id']);
-      debugPrint('list_detail: Database update successful for item "${productName}".');
+      debugPrint('list_detail: Database update successful for item "$productName".');
       
       // Tamamlama oranını güncelle - debounce kaldırıldı
       await _updateCompletionRate(); 
@@ -366,7 +366,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ürün durumu güncellenemedi: $e')),
         );
-        debugPrint('list_detail: Error updating item "${productName}". Reverting optimistic update. Error: $e');
+        debugPrint('list_detail: Error updating item "$productName". Reverting optimistic update. Error: $e');
       }
     }
   }
@@ -407,12 +407,12 @@ class _ListDetailPageState extends State<ListDetailPage> {
     setState(() {
       _items.removeAt(index);
       _isChanged = true;
-      debugPrint('list_detail: Optimistically deleted item "${productName}".');
+      debugPrint('list_detail: Optimistically deleted item "$productName".');
     });
 
     try {
       await supabase.from('list_items').delete().eq('id', itemId);
-      debugPrint('list_detail: Database delete successful for item "${productName}".');
+      debugPrint('list_detail: Database delete successful for item "$productName".');
       await _updateCompletionRate(); // Silme sonrası oranı güncelle
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -432,7 +432,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ürün silinemedi: $e')),
         );
-        debugPrint('list_detail: Error deleting item "${productName}". Reverting optimistic delete. Error: $e');
+        debugPrint('list_detail: Error deleting item "$productName". Reverting optimistic delete. Error: $e');
       }
     }
   }
@@ -552,8 +552,8 @@ class _ListDetailPageState extends State<ListDetailPage> {
                     offset: const Offset(0, 0),
                     scrollbarTheme: ScrollbarThemeData(
                       radius: const Radius.circular(40),
-                      thickness: MaterialStateProperty.all(6),
-                      thumbVisibility: MaterialStateProperty.all(true),
+                      thickness: WidgetStateProperty.all(6),
+                      thumbVisibility: WidgetStateProperty.all(true),
                     ),
                   ),
                 ),
@@ -922,7 +922,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: const Offset(0, 3),
@@ -978,10 +978,10 @@ class _ListDetailPageState extends State<ListDetailPage> {
               padding: const EdgeInsets.only(top: 12.0),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 18, color: Colors.blueGrey),
+                  const Icon(Icons.info_outline, size: 18, color: Colors.blueGrey),
                   const SizedBox(width: 5),
                   Text(
-                    'Bu liste sizinle "${listOwnerEmail}" tarafından paylaşıldı.',
+                    'Bu liste sizinle "$listOwnerEmail" tarafından paylaşıldı.',
                     style: TextStyle(fontSize: 13, color: Colors.blueGrey.shade700, fontStyle: FontStyle.italic),
                   ),
                 ],
@@ -1058,7 +1058,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     spreadRadius: 1,
                     blurRadius: 5,
                     offset: const Offset(0, 3),
@@ -1131,7 +1131,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     spreadRadius: 1,
                     blurRadius: 5,
                     offset: const Offset(0, 3),
@@ -1163,7 +1163,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     spreadRadius: 1,
                     blurRadius: 5,
                     offset: const Offset(0, 3),

@@ -119,7 +119,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   // Profil Avatarı
                   CircleAvatar(
                     radius: 60,
-                    backgroundColor: primaryColor.withOpacity(0.2),
+                    backgroundColor: primaryColor.withValues(alpha: 0.2),
                     child: Icon(
                       Icons.person_rounded,
                       size: 70,

@@ -196,7 +196,7 @@ class _MyListsPageState extends State<MyListsPage> {
                 final index = _lists.indexWhere((list) => list['id'] == updatedListId);
                 if (index != -1) {
                   _lists[index]['completion_rate'] = newCompletionRate;
-                  debugPrint('List "${updatedListName}" completion rate updated in UI to: $newCompletionRate');
+                  debugPrint('List "$updatedListName" completion rate updated in UI to: $newCompletionRate');
                 } else {
                   debugPrint('Updated list not found in current view. Re-fetching all lists.');
                   _fetchLists();
@@ -569,7 +569,7 @@ class _MyListsPageState extends State<MyListsPage> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      '${itemCount} Ürün',
+                                      '$itemCount Ürün',
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: Colors.grey.shade700,

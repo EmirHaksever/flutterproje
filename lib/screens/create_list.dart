@@ -17,7 +17,7 @@ class CreateListPage extends StatefulWidget {
   });
 
   @override
-  _CreateListPageState createState() => _CreateListPageState();
+  State<CreateListPage> createState() => _CreateListPageState();
 }
 
 class _CreateListPageState extends State<CreateListPage> {
@@ -163,7 +163,7 @@ class _CreateListPageState extends State<CreateListPage> {
     final MaterialColor globalPrimaryColor = widget.customPrimarySwatch;
 
     // Filtrelenmiş ürün listesi
-    List<Map<String, dynamic>> _filteredProducts = products.where((product) {
+    List<Map<String, dynamic>> filteredProducts = products.where((product) {
       if (_filterCategory == null || _filterCategory == 'Tümü') {
         return true; // Kategori filtresi yoksa tümünü göster
       }
@@ -216,7 +216,7 @@ class _CreateListPageState extends State<CreateListPage> {
 
             // Ürün Listesi
             Expanded(
-              child: _buildProductList(_filteredProducts, globalPrimaryColor),
+              child: _buildProductList(filteredProducts, globalPrimaryColor),
             ),
           ],
         ),
@@ -267,7 +267,7 @@ class _CreateListPageState extends State<CreateListPage> {
         const SizedBox(height: 15),
         // Kategori Seçimi (Dropdown)
         DropdownButtonFormField<String>(
-          value: _selectedCategory,
+          initialValue: _selectedCategory,
           hint: const Text('Kategori Seç'),
           decoration: InputDecoration(
             labelText: 'Kategori',
@@ -334,7 +334,7 @@ class _CreateListPageState extends State<CreateListPage> {
         const SizedBox(height: 15),
         // Market Seçimi (Dropdown)
         DropdownButtonFormField<String>(
-          value: _selectedMarket,
+          initialValue: _selectedMarket,
           hint: const Text('Market Seç (Opsiyonel)'),
           decoration: InputDecoration(
             labelText: 'Market',
@@ -395,7 +395,7 @@ class _CreateListPageState extends State<CreateListPage> {
   // Kategori filtreleme dropdown'ı oluşturan yardımcı metod
   Widget _buildCategoryFilterDropdown(MaterialColor globalPrimaryColor) {
     return DropdownButtonFormField<String>(
-      value: _filterCategory,
+      initialValue: _filterCategory,
       hint: const Text('Kategoriye Göre Filtrele'),
       decoration: InputDecoration(
         labelText: 'Listeyi Filtrele',

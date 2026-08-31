@@ -57,7 +57,7 @@ class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
@@ -90,8 +90,8 @@ class _MyAppState extends State<MyApp> {
         primarySwatch: customPrimaryColor, // Ana renk paleti olarak yeni özel renk kullanıldı
         primaryColor: const Color(0xFF4DB6AC), // primaryColor'ı açıkça ayarla
         scaffoldBackgroundColor: Colors.grey[100],
-        appBarTheme: AppBarTheme( // AppBar teması da yeni ana rengi kullanır
-          backgroundColor: const Color(0xFF4DB6AC), // AppBar rengini de açıkça ayarla
+        appBarTheme: const AppBarTheme( // AppBar teması da yeni ana rengi kullanır
+          backgroundColor: Color(0xFF4DB6AC), // AppBar rengini de açıkça ayarla
           foregroundColor: Colors.white,
         ),
       ),
@@ -100,8 +100,8 @@ class _MyAppState extends State<MyApp> {
         primarySwatch: customPrimaryColor, // Koyu tema için de yeni özel ana renk kullanıldı
         primaryColor: const Color(0xFF4DB6AC), // primaryColor'ı açıkça ayarla
         scaffoldBackgroundColor: Colors.grey[800],
-        appBarTheme: AppBarTheme( // Koyu tema AppBar teması da yeni özel ana rengi kullanır
-          backgroundColor: const Color(0xFF4DB6AC), // AppBar rengini de açıkça ayarla
+        appBarTheme: const AppBarTheme( // Koyu tema AppBar teması da yeni özel ana rengi kullanır
+          backgroundColor: Color(0xFF4DB6AC), // AppBar rengini de açıkça ayarla
           foregroundColor: Colors.white,
         ),
       ),
