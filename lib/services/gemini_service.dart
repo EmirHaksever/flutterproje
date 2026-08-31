@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -13,7 +14,7 @@ class GeminiService {
   static final String _model =
       dotenv.env['GEMINI_MODEL']?.trim().isNotEmpty == true
           ? dotenv.env['GEMINI_MODEL']!.trim()
-          : 'gemini-flash-latest';
+          : 'gemini-3.6-flash';
   final String apiUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent';
 
@@ -72,10 +73,14 @@ class GeminiService {
               },
             }),
           )
-          .timeout(const Duration(seconds: 30));
-    } on Exception {
+          .timeout(const Duration(seconds: 25));
+    } on TimeoutException {
       throw Exception(
-          'Yapay zekâ servisine ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.');
+          'Yapay zekâ 25 saniyede yanıt vermedi. Model adı ($_model) güncel '
+          'olmayabilir; .env dosyasındaki GEMINI_MODEL değerini kontrol et.');
+    } on http.ClientException {
+      throw Exception(
+          'Yapay zekâ servisine ulaşılamadı. İnternet bağlantını kontrol et.');
     }
 
     if (response.statusCode == 200) {
