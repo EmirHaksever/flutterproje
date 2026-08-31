@@ -395,9 +395,10 @@ class _HomePageState extends State<HomePage> {
             onPressed: widget.onMenuTap,
             icon: const Icon(Icons.menu_rounded),
             padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
             constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
         ],
         Expanded(
           child: Column(
@@ -406,7 +407,7 @@ class _HomePageState extends State<HomePage> {
               Text(
                 'Merhaba, ${userName.isEmpty ? '' : userName} 👋',
                 style: TextStyle(
-                    fontSize: 21,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: scheme.onSurface),
                 maxLines: 1,
