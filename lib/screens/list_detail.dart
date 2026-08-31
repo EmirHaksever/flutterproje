@@ -596,7 +596,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10), // Yuvarlak köşeler
                       border: Border.all(color: Colors.grey.shade400), // Kenarlık
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                     ),
                   ),
                   menuItemStyleData: const MenuItemStyleData(
@@ -607,7 +607,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                     width: 200,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                     ),
                     offset: const Offset(0, 0),
                     scrollbarTheme: ScrollbarThemeData(
@@ -875,7 +875,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
       margin: const EdgeInsets.symmetric(vertical: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
@@ -893,14 +893,14 @@ class _ListDetailPageState extends State<ListDetailPage> {
             children: [
               Icon(Icons.person_outline, size: 20, color: themePrimaryColor),
               const SizedBox(width: 8),
-              const Text("Liste Sahibi:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
+              Text("Liste Sahibi:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Theme.of(context).colorScheme.onSurface)),
             ],
           ),
           Padding(
             padding: const EdgeInsets.only(left: 28.0),
             child: Text(
               listOwnerEmail,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 12),
@@ -908,13 +908,13 @@ class _ListDetailPageState extends State<ListDetailPage> {
             children: [
               Icon(Icons.group_outlined, size: 20, color: themePrimaryColor),
               const SizedBox(width: 8),
-              const Text("Paylaşılan Kullanıcılar:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
+              Text("Paylaşılan Kullanıcılar:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Theme.of(context).colorScheme.onSurface)),
             ],
           ),
           Padding(
             padding: const EdgeInsets.only(left: 28.0),
             child: _sharedEmails.isEmpty
-                ? Text('Bu liste henüz kimseyle paylaşılmadı.', style: TextStyle(fontSize: 14, color: Colors.grey.shade700))
+                ? Text('Bu liste henüz kimseyle paylaşılmadı.', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant))
                 : Wrap(
                     spacing: 8,
                     runSpacing: 4,
@@ -935,11 +935,11 @@ class _ListDetailPageState extends State<ListDetailPage> {
               padding: const EdgeInsets.only(top: 12.0),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 18, color: Colors.blueGrey),
+                  Icon(Icons.info_outline, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   const SizedBox(width: 5),
                   Text(
                     'Bu liste sizinle "$listOwnerEmail" tarafından paylaşıldı.',
-                    style: TextStyle(fontSize: 13, color: Colors.blueGrey.shade700, fontStyle: FontStyle.italic),
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
                   ),
                 ],
               ),
@@ -968,32 +968,29 @@ class _ListDetailPageState extends State<ListDetailPage> {
 
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Daha açık arka plan
-      appBar: AppBar( // Standart AppBar'a geri döndük
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Daha açık arka plan
+      appBar: AppBar(
         title: Text(
           widget.listData['name'] ?? 'Liste Detayı',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: primaryColor, // Temanın ana rengini kullan
-        elevation: 0, // AppBar'ın gölgesini kaldır
         centerTitle: true,
         actions: [
-          if (isOwner) // Sadece sahip ise paylaşma ve silme butonlarını göster
+          if (isOwner)
             IconButton(
-              icon: const Icon(Icons.share, color: Colors.white),
+              icon: const Icon(Icons.share_outlined),
               tooltip: 'Listeyi Paylaş',
               onPressed: _showShareDialog,
             ),
           if (isOwner)
             IconButton(
-              icon: const Icon(Icons.delete_forever, color: Colors.white),
+              icon: const Icon(Icons.delete_outline),
               tooltip: 'Listeyi Sil',
               onPressed: _deleteList,
             ),
-          // Paylaşılan listelerde değişiklik kaydetme butonu gizlendi
-          if (isOwner || _isChanged) // Sadece sahibi ise veya paylaşılan listelerde completion değiştiyse kaydet
+          if (isOwner || _isChanged)
             IconButton(
-              icon: Icon(_isChanged ? Icons.save : Icons.save_alt_outlined, color: Colors.white),
+              icon: Icon(_isChanged ? Icons.save : Icons.save_alt_outlined),
               tooltip: 'Değişiklikleri Kaydet',
               onPressed: _showSaveChangesDialog,
             ),
@@ -1031,7 +1028,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                       const SizedBox(width: 8),
                       Text(
                         'Oluşturulma Tarihi: ${createdAt != null ? DateFormat('dd MMMEEEE', 'tr_TR').format(createdAt) : 'Bilinmiyor'}',
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                        style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -1042,7 +1039,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                       const SizedBox(width: 8),
                       Text(
                         'Liste Mağazası: $listMarketName', // Mağaza bilgisini göster
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                        style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -1053,21 +1050,21 @@ class _ListDetailPageState extends State<ListDetailPage> {
                       const SizedBox(width: 8),
                       Text(
                         'Liste Kategorisi: $listCategoryName', // Kategori bilgisini göster
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                        style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Tamamlanma Oranı: %${(currentCompletionRate * 100).round()}', // Yeni değer
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                   ),
                   const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: LinearProgressIndicator(
                       value: currentCompletionRate, // Yeni değer
-                      backgroundColor: Colors.grey[300],
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       color: primaryColor, // Ana renk
                       minHeight: 12,
                     ),
@@ -1084,7 +1081,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
@@ -1100,7 +1097,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                 children: [
                   Text(
                     'Tamamlanan Ürünleri Gizle',
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade800),
+                    style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
                   ),
                   Switch.adaptive( // Platforma uygun switch
                     value: _hideCompleted,
@@ -1116,7 +1113,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
@@ -1214,7 +1211,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
             // Products List Title
             Text(
               'Alışveriş Listesi Ürünleri',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
             ),
             const SizedBox(height: 12),
 
@@ -1249,7 +1246,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                         fontSize: 17, // Slightly larger font
                         fontWeight: FontWeight.w600, // Slightly bolder
                         decoration: item['is_completed'] ? TextDecoration.lineThrough : TextDecoration.none,
-                        color: item['is_completed'] ? Colors.grey[500] : Colors.black87, // Faded for completed
+                        color: item['is_completed'] ? Theme.of(context).colorScheme.onSurfaceVariant : Theme.of(context).colorScheme.onSurface, // Faded for completed
                       ),
                     ),
                     subtitle: Padding(
@@ -1259,17 +1256,17 @@ class _ListDetailPageState extends State<ListDetailPage> {
                         children: [
                           Text(
                             'Miktar: $quantity',
-                            style: TextStyle(fontSize: 13, color: Colors.grey[700], fontWeight: FontWeight.w500),
+                            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                           ),
                           if (market != null && market.isNotEmpty)
                             Text(
                               'Mağaza: $market',
-                              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                           if (category != null && category.isNotEmpty)
                             Text(
                               'Kategori: $category',
-                              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                           if (tags != null && tags.isNotEmpty)
                             Padding(
@@ -1296,7 +1293,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
                             children: [
                               IconButton(
                                 icon: Icon(Icons.edit_outlined,
-                                    color: Colors.grey.shade600),
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 tooltip: 'Düzenle',
                                 onPressed: () => _editItemDialog(realIndex),
                               ),
