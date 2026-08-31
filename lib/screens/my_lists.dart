@@ -34,16 +34,6 @@ class _MyListsPageState extends State<MyListsPage> {
   RealtimeChannel? _shoppingListsChannel;
   RealtimeChannel? _sharedListsChannel;
 
-  final List<Color> _cardColors = [
-    Colors.blue.shade50,
-    Colors.green.shade50,
-    Colors.orange.shade50,
-    Colors.purple.shade50,
-    Colors.red.shade50,
-    Colors.teal.shade50,
-    Colors.indigo.shade50,
-    Colors.pink.shade50,
-  ];
 
   @override
   void initState() {
@@ -292,42 +282,35 @@ class _MyListsPageState extends State<MyListsPage> {
     );
   }
 
-  Color _getCardColor(String listId) {
-    return _cardColors[listId.hashCode % _cardColors.length];
-  }
-
   @override
   Widget build(BuildContext context) {
-    final MaterialColor primary = widget.customPrimarySwatch;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Listelerim',
-            style:
-                TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: Column(
         children: [
           if (_isDeleting || _isLoadingLists)
-            LinearProgressIndicator(minHeight: 4, color: primary.shade700),
+            LinearProgressIndicator(minHeight: 3, color: scheme.primary),
           Expanded(
             child: _isLoadingLists
-                ? Center(child: CircularProgressIndicator(color: primary))
+                ? const Center(child: CircularProgressIndicator())
                 : _lists.isEmpty
-                    ? _EmptyState(primary: primary, onCreate: _openCreateList)
+                    ? _EmptyState(
+                        primary: widget.customPrimarySwatch,
+                        onCreate: _openCreateList)
                     : ListView.builder(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                         itemCount: _lists.length,
                         itemBuilder: (context, index) {
                           final list = _lists[index];
                           return _ListCard(
                             list: list,
-                            primary: primary,
-                            background: _getCardColor(list.id),
+                            primary: widget.customPrimarySwatch,
+                            background: scheme.surface,
                             onOpen: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -342,17 +325,6 @@ class _MyListsPageState extends State<MyListsPage> {
                       ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'myListsFab', // IndexedStack'te birden çok FAB olduğu için benzersiz tag
-        onPressed: _openCreateList,
-        icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
-        label: const Text('Yeni Liste Oluştur',
-            style:
-                TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: primary.shade700,
-        elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
     );
   }
@@ -373,18 +345,18 @@ class _EmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.assignment_turned_in_outlined,
-                size: 80, color: Colors.grey[400]),
+                size: 80, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(height: 20),
             Text('Henüz hiç listeniz yok.',
                 style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey[700]),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center),
             const SizedBox(height: 10),
             Text(
               'Yeni bir alışveriş listesi oluşturarak başlayın veya sizinle paylaşılan listeleri bekleyin!',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
@@ -452,7 +424,7 @@ class _ListCard extends StatelessWidget {
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
-                          color: Colors.grey.shade800),
+                          color: Theme.of(context).colorScheme.onSurface),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -467,15 +439,15 @@ class _ListCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text('${list.itemCount} Ürün',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant)),
               Text(
                 'Oluşturulma: ${DateFormat('dd MMMM yyyy', 'tr_TR').format(list.createdAt)}',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
               LinearProgressIndicator(
                 value: rate,
-                backgroundColor: Colors.grey[300],
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                 color: primary,
                 minHeight: 8,
                 borderRadius: BorderRadius.circular(4),
@@ -487,7 +459,7 @@ class _ListCard extends StatelessWidget {
                   '${(rate * 100).round()}% tamamlandı',
                   style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.bold),
                 ),
               ),
