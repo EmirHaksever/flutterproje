@@ -85,6 +85,18 @@ class ListRepository {
         .update({'completion_rate': rate}).eq('id', listId);
   }
 
+  /// Kullanıcının görebildiği ürünlerde geçen benzersiz kategori adları
+  /// (kategori keşfi için).
+  Future<List<String>> fetchUsedCategories() async {
+    final rows = await _client.from('list_items').select('category');
+    return rows
+        .map((r) => r['category'] as String?)
+        .whereType<String>()
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
   // --- list_items ----------------------------------------------------------
 
   Future<List<ListItem>> fetchItems(String listId) async {

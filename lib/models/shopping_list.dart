@@ -50,6 +50,16 @@ class ShoppingList {
         'user_id': userId,
       };
 
+  /// Henüz model kullanmayan ekranlara (ör. ListDetailPage) geçici köprü.
+  /// Faz 3.4'te ListDetailPage modele geçince kaldırılacak.
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'user_id': userId,
+        'name': name,
+        'created_at': createdAt.toIso8601String(),
+        'completion_rate': completionRate,
+      };
+
   ShoppingList copyWith({
     String? name,
     double? completionRate,
