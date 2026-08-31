@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// import 'package:image_picker/image_picker.dart'; // Kamera veya galeri için eklenebilir
-// import 'package:path_provider/path_provider.dart'; // Resim yolu için
-// import 'dart:io'; // File işlemleri için
+
+import '../theme/app_theme.dart';
 
 class CreateListPage extends StatefulWidget {
-  final String? initialFilterCategory; // Yeni: Başlangıç filtre kategorisi
-  final List<Map<String, dynamic>> availableCategories; // Yeni: Tüm mevcut kategoriler
-  final MaterialColor customPrimarySwatch; // Zorunlu parametre yapıldı
+  final String? initialFilterCategory;
+  final List<Map<String, dynamic>> availableCategories;
+  final MaterialColor customPrimarySwatch;
 
   const CreateListPage({
     super.key,
     this.initialFilterCategory,
     required this.availableCategories,
-    required this.customPrimarySwatch, // Zorunlu parametre yapıldı
+    required this.customPrimarySwatch,
   });
 
   @override
@@ -22,452 +21,434 @@ class CreateListPage extends StatefulWidget {
 
 class _CreateListPageState extends State<CreateListPage> {
   final TextEditingController _listNameController = TextEditingController();
-  final TextEditingController _productNameController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController(text: '1'); // Yeni: Adet sayısı için
-  final TextEditingController _featuresController = TextEditingController(); // Yeni: Özellikler için
-  final TextEditingController _newCategoryController = TextEditingController(); // Yeni kategori girişi için
-  final TextEditingController _newMarketController = TextEditingController();   // Yeni market girişi için
-
-  String? _selectedCategory; // Seçilen kategori Dropdown'dan gelir (veya "Yeni Kategori Ekle")
-  String? _selectedMarket;   // Seçilen market Dropdown'dan gelir (veya "Yeni Mağaza Ekle")
-  String? _filterCategory;   // Ürün listesini filtrelemek için kullanılan kategori
-
-  bool _showNewCategoryInput = false; // Yeni kategori metin alanını göster/gizle
-  bool _showNewMarketInput = false;   // Yeni market metin alanını göster/gizle
-
-  List<Map<String, dynamic>> products = []; // Mevcut ürünler
   final supabase = Supabase.instance.client;
 
-  // Mevcut marketler (şimdilik statik, ileride Supabase'den çekilebilir)
-  final List<String> _availableMarkets = ['Migros', 'Carrefour', 'Şok', 'Bim', 'Yerel Market'];
+  final List<Map<String, dynamic>> products = [];
+  bool _saving = false;
 
+  static const Map<String, List<String>> _templates = {
+    'Haftalık Market': ['Süt', 'Ekmek', 'Yumurta', 'Peynir', 'Domates'],
+    'Aile Alışverişi': ['Süt', 'Ekmek', 'Makarna', 'Pirinç', 'Tavuk'],
+    'Temizlik': [
+      'Çamaşır Deterjanı',
+      'Bulaşık Deterjanı',
+      'Çöp Poşeti',
+      'Kağıt Havlu'
+    ],
+    'Bebek': ['Bebek Bezi', 'Islak Mendil', 'Bebek Maması', 'Biberon'],
+    'Kahvaltılık': ['Yumurta', 'Peynir', 'Zeytin', 'Bal', 'Tereyağı'],
+  };
 
   @override
   void initState() {
     super.initState();
-    // Eğer bir başlangıç filtre kategorisi varsa, onu seçili hale getir
-    if (widget.initialFilterCategory != null && widget.initialFilterCategory!.isNotEmpty) {
-      _selectedCategory = widget.initialFilterCategory;
-      _filterCategory = widget.initialFilterCategory; // Filtrelemek için de kullan
-    }
-    // İlk kategoriyi varsayılan olarak seç
-    if (_selectedCategory == null && widget.availableCategories.isNotEmpty) {
-      _selectedCategory = widget.availableCategories.first['name'].toString();
+    if (widget.initialFilterCategory != null &&
+        widget.initialFilterCategory!.isNotEmpty) {
+      // Bir kategoriden gelindiyse ilk ürün o kategoride başlasın diye sakla.
+      _pendingCategory = widget.initialFilterCategory;
     }
   }
+
+  String? _pendingCategory;
 
   @override
   void dispose() {
     _listNameController.dispose();
-    _productNameController.dispose();
-    _quantityController.dispose(); // Yeni controller dispose edildi
-    _featuresController.dispose(); // Yeni controller dispose edildi
-    _newCategoryController.dispose();
-    _newMarketController.dispose();
     super.dispose();
   }
 
-  void _addProduct() {
-    if (_productNameController.text.isEmpty || _selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ürün adı ve kategori boş olamaz!')),
-      );
-      return;
-    }
-
-    final quantity = int.tryParse(_quantityController.text) ?? 1; // Adet sayısını al, varsayılan 1
-    final features = _featuresController.text.trim().isNotEmpty
-        ? _featuresController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-        : <String>[]; // Özellikleri virgülle ayırarak al
-
+  void _applyTemplate(String key) {
     setState(() {
-      products.add({
-        'product_name': _productNameController.text,
-        'category': _selectedCategory,
-        'market': _selectedMarket,
-        'quantity': quantity, // Adet sayısı eklendi
-        'features': features, // Özellikler eklendi
-        'is_completed': false, // Varsayılan olarak tamamlanmamış
-      });
-      _productNameController.clear();
-      _quantityController.text = '1'; // Adet sayısını sıfırla
-      _featuresController.clear(); // Özellikleri temizle
+      if (_listNameController.text.trim().isEmpty) {
+        _listNameController.text = key;
+      }
+      final existing =
+          products.map((p) => (p['product_name'] as String).toLowerCase()).toSet();
+      for (final name in _templates[key]!) {
+        if (existing.contains(name.toLowerCase())) continue;
+        products.add(_newProduct(name, _pendingCategory));
+      }
     });
   }
 
+  Map<String, dynamic> _newProduct(String name, String? category) => {
+        'product_name': name,
+        'category': category,
+        'market': null,
+        'quantity': 1,
+        'features': <String>[],
+        'is_completed': false,
+      };
+
   void _removeProduct(int index) {
+    setState(() => products.removeAt(index));
+  }
+
+  void _changeQty(int index, int delta) {
     setState(() {
-      products.removeAt(index);
+      final q = (products[index]['quantity'] as int? ?? 1) + delta;
+      products[index]['quantity'] = q < 1 ? 1 : q;
     });
+  }
+
+  Future<void> _addProductSheet() async {
+    final nameCtrl = TextEditingController();
+    String? category = _pendingCategory;
+    int qty = 1;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: StatefulBuilder(
+            builder: (ctx, setSheet) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Ürün Ekle',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onSurface)),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    hintText: 'Ürün adı (örn: Süt 1 L)',
+                    prefixIcon: Icon(Icons.shopping_basket_outlined),
+                  ),
+                ),
+                if (widget.availableCategories.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text('Kategori',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.availableCategories.map((c) {
+                      final name = c['name'].toString();
+                      final sel = category == name;
+                      return ChoiceChip(
+                        label: Text(name),
+                        selected: sel,
+                        onSelected: (_) =>
+                            setSheet(() => category = sel ? null : name),
+                      );
+                    }).toList(),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Text('Adet',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface)),
+                    const Spacer(),
+                    _QtyStepper(
+                      value: qty,
+                      onChanged: (v) => setSheet(() => qty = v),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: () {
+                      final name = nameCtrl.text.trim();
+                      if (name.isEmpty) return;
+                      setState(() {
+                        final p = _newProduct(name, category);
+                        p['quantity'] = qty;
+                        products.add(p);
+                      });
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Ekle'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _saveList() async {
-    if (_listNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Liste adı boş olamaz!')),
-      );
+    if (_saving) return;
+    final name = _listNameController.text.trim();
+    if (name.isEmpty) {
+      _snack('Liste adı boş olamaz.');
       return;
     }
     if (products.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Listede ürün bulunmuyor!')),
-      );
+      _snack('En az bir ürün ekle.');
       return;
     }
 
+    setState(() => _saving = true);
     try {
       final userId = supabase.auth.currentUser!.id;
-      // Yeni alışveriş listesi oluştur
-      final newShoppingList = await supabase.from('shopping_lists').insert({
-        'name': _listNameController.text,
-        'user_id': userId,
-      }).select().single();
+      final newList = await supabase
+          .from('shopping_lists')
+          .insert({'name': name, 'user_id': userId})
+          .select()
+          .single();
+      final listId = newList['id'];
 
-      final listId = newShoppingList['id'];
-
-      // Ürünleri list_items tablosuna ekle
-      final itemsToInsert = products.map((product) {
-        return {
-          'product_name': product['product_name'],
-          'category': product['category'],
-          'market': product['market'],
-          'quantity': product['quantity'], // Adet sayısı eklendi
-          'features': product['features'], // Özellikler eklendi (List<String> olarak kaydedilecek)
-          'is_completed': product['is_completed'],
-          'list_id': listId,
-        };
-      }).toList();
-
-      await supabase.from('list_items').insert(itemsToInsert);
+      final items = products
+          .map((p) => {
+                'product_name': p['product_name'],
+                'category': p['category'],
+                'market': p['market'],
+                'quantity': p['quantity'],
+                'features': p['features'],
+                'is_completed': false,
+                'list_id': listId,
+              })
+          .toList();
+      await supabase.from('list_items').insert(items);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Liste başarıyla kaydedildi!')),
-        );
-        Navigator.pop(context); // Mevcut CreateListPage'i kapat
-        Navigator.pushReplacementNamed(context, '/home'); // Ana sayfaya dön
+        _snack('Liste oluşturuldu.');
+        Navigator.pop(context);
       }
     } catch (e) {
-      debugPrint('Liste kaydedilirken hata oluştu: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Liste kaydedilirken bir hata oluştu: $e')),
-        );
-      }
+      debugPrint('Liste kaydedilemedi: $e');
+      if (mounted) _snack('Liste kaydedilirken bir hata oluştu.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    final filtered = products.where((p) {
-      if (_filterCategory == null || _filterCategory == 'Tümü') return true;
-      return p['category'] == _filterCategory;
-    }).toList();
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Yeni Liste'),
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(title: const Text('Yeni Liste Oluştur')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
         children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFDFF6E4), Color(0xFFF7FCF8)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.playlist_add_rounded,
+                    size: 52, color: scheme.primary),
+                const SizedBox(height: 8),
+                Text('Yeni listeni oluştur',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onSurface)),
+                const SizedBox(height: 4),
+                Text('Liste adını ver ve ürünlerini ekle.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _label(scheme, 'Liste Adı'),
+          const SizedBox(height: 8),
           TextField(
             controller: _listNameController,
-            decoration: const InputDecoration(
-              labelText: 'Liste adı',
-              hintText: 'Örn: Haftalık Market',
-              prefixIcon: Icon(Icons.drive_file_rename_outline),
-            ),
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(hintText: 'Örn: Haftalık Market'),
             onChanged: (_) => setState(() {}),
           ),
-          const SizedBox(height: 20),
-          _sectionLabel(scheme, 'Ürün ekle'),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: _buildAddForm(scheme),
-            ),
+          const SizedBox(height: 22),
+          _label(scheme, 'Hızlı Şablonlar'),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _templates.keys
+                .map((k) => ActionChip(
+                      label: Text(k),
+                      onPressed: () => _applyTemplate(k),
+                    ))
+                .toList(),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _sectionLabel(scheme, 'Ürünler (${products.length})'),
-              if (widget.availableCategories.isNotEmpty)
-                _filterChip(scheme),
+              _label(scheme, 'Ürünler'),
+              Text('${products.length} ürün',
+                  style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant)),
             ],
           ),
-          const SizedBox(height: 8),
-          if (filtered.isEmpty)
+          const SizedBox(height: 10),
+          if (products.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text('Henüz ürün eklenmedi.',
-                    style: TextStyle(color: scheme.onSurfaceVariant)),
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('Henüz ürün eklenmedi.',
+                  style: TextStyle(color: scheme.onSurfaceVariant)),
             )
           else
-            ...filtered.map((p) => _productCard(scheme, p)),
+            ...List.generate(products.length, (i) => _productRow(scheme, i)),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _addProductSheet,
+              icon: const Icon(Icons.add),
+              label: const Text('Ürün Ekle'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 52,
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saving ? null : _saveList,
+              child: _saving
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.4, color: Colors.white),
+                    )
+                  : const Text('Listeyi Oluştur'),
+            ),
+          ),
         ],
-      ),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(
-            16, 8, 16, 8 + MediaQuery.of(context).padding.bottom),
-        child: FilledButton.icon(
-          onPressed: _saveList,
-          icon: const Icon(Icons.check_rounded),
-          label: const Text('Listeyi Kaydet'),
-          style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50)),
-        ),
       ),
     );
   }
 
-  Widget _sectionLabel(ColorScheme scheme, String text) {
-    return Text(text,
+  Widget _label(ColorScheme scheme, String text) => Text(
+        text,
         style: TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: scheme.primary));
+            color: scheme.onSurface),
+      );
+
+  Widget _productRow(ColorScheme scheme, int i) {
+    final p = products[i];
+    final category = p['category'] as String?;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 15,
+            backgroundColor: AppTheme.heroGreenBg,
+            child: Icon(Icons.shopping_basket_outlined,
+                size: 16, color: scheme.primary),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(p['product_name'] as String,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                if (category != null && category.isNotEmpty)
+                  Text(category,
+                      style: TextStyle(
+                          fontSize: 11, color: scheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          _QtyStepper(
+            value: p['quantity'] as int? ?? 1,
+            onChanged: (v) =>
+                _changeQty(i, v - (p['quantity'] as int? ?? 1)),
+            dense: true,
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close, size: 18, color: scheme.onSurfaceVariant),
+            onPressed: () => _removeProduct(i),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  Widget _buildAddForm(ColorScheme scheme) {
-    final catItems = [
-      ...widget.availableCategories.map((c) => DropdownMenuItem(
-          value: c['name'].toString(), child: Text(c['name'].toString()))),
-      const DropdownMenuItem(
-          value: 'Yeni Kategori Ekle', child: Text('+ Yeni kategori')),
-    ];
-    final marketItems = [
-      ..._availableMarkets.map(
-          (m) => DropdownMenuItem(value: m, child: Text(m))),
-      const DropdownMenuItem(
-          value: 'Yeni Mağaza Ekle', child: Text('+ Yeni mağaza')),
-    ];
+/// − sayı + adet seçici.
+class _QtyStepper extends StatelessWidget {
+  const _QtyStepper({
+    required this.value,
+    required this.onChanged,
+    this.dense = false,
+  });
 
-    return Column(
+  final int value;
+  final ValueChanged<int> onChanged;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final s = dense ? 18.0 : 22.0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        TextField(
-          controller: _productNameController,
-          decoration: const InputDecoration(
-            labelText: 'Ürün adı',
-            hintText: 'Örn: Süt',
-            prefixIcon: Icon(Icons.shopping_basket_outlined),
-          ),
-          onSubmitted: (_) => _addProduct(),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: Icon(Icons.remove, size: s, color: scheme.onSurfaceVariant),
+          onPressed: value > 1 ? () => onChanged(value - 1) : null,
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _quantityController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Adet',
-                  prefixIcon: Icon(Icons.tag),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _featuresController,
-                decoration: const InputDecoration(
-                  labelText: 'Etiketler',
-                  hintText: 'organik, büyük',
-                ),
-                onSubmitted: (_) => _addProduct(),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedCategory,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Kategori',
-            prefixIcon: Icon(Icons.category_outlined),
-          ),
-          items: catItems,
-          onChanged: (v) => setState(() {
-            if (v == 'Yeni Kategori Ekle') {
-              _showNewCategoryInput = true;
-              _selectedCategory = null;
-            } else {
-              _selectedCategory = v;
-              _showNewCategoryInput = false;
-            }
-          }),
-        ),
-        if (_showNewCategoryInput) ...[
-          const SizedBox(height: 12),
-          TextField(
-            controller: _newCategoryController,
-            decoration: InputDecoration(
-              labelText: 'Yeni kategori adı',
-              suffixIcon: IconButton(
-                icon: Icon(Icons.check_circle, color: scheme.primary),
-                onPressed: () {
-                  if (_newCategoryController.text.trim().isNotEmpty) {
-                    setState(() {
-                      _selectedCategory = _newCategoryController.text.trim();
-                      _showNewCategoryInput = false;
-                      _newCategoryController.clear();
-                    });
-                  }
-                },
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedMarket,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Mağaza (opsiyonel)',
-            prefixIcon: Icon(Icons.storefront_outlined),
-          ),
-          items: marketItems,
-          onChanged: (v) => setState(() {
-            if (v == 'Yeni Mağaza Ekle') {
-              _showNewMarketInput = true;
-              _selectedMarket = null;
-            } else {
-              _selectedMarket = v;
-              _showNewMarketInput = false;
-            }
-          }),
-        ),
-        if (_showNewMarketInput) ...[
-          const SizedBox(height: 12),
-          TextField(
-            controller: _newMarketController,
-            decoration: InputDecoration(
-              labelText: 'Yeni mağaza adı',
-              suffixIcon: IconButton(
-                icon: Icon(Icons.check_circle, color: scheme.primary),
-                onPressed: () {
-                  if (_newMarketController.text.trim().isNotEmpty) {
-                    setState(() {
-                      _availableMarkets.add(_newMarketController.text.trim());
-                      _selectedMarket = _newMarketController.text.trim();
-                      _showNewMarketInput = false;
-                      _newMarketController.clear();
-                    });
-                  }
-                },
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 16),
         SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _addProduct,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Ürünü listeye ekle'),
-          ),
+          width: 20,
+          child: Text('$value',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: Icon(Icons.add, size: s, color: scheme.primary),
+          onPressed: () => onChanged(value + 1),
         ),
       ],
-    );
-  }
-
-  Widget _filterChip(ColorScheme scheme) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: _filterCategory ?? 'Tümü',
-        icon: const Icon(Icons.filter_list_rounded),
-        style: TextStyle(color: scheme.onSurface, fontSize: 13),
-        borderRadius: BorderRadius.circular(12),
-        items: [
-          const DropdownMenuItem(value: 'Tümü', child: Text('Tümü')),
-          ...widget.availableCategories.map((c) => DropdownMenuItem(
-              value: c['name'].toString(),
-              child: Text(c['name'].toString()))),
-        ],
-        onChanged: (v) => setState(() => _filterCategory = v),
-      ),
-    );
-  }
-
-  Widget _productCard(ColorScheme scheme, Map<String, dynamic> p) {
-    final realIndex = products.indexOf(p);
-    final done = p['is_completed'] == true;
-    final features = (p['features'] as List?)?.cast<String>() ?? const [];
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
-        child: Row(
-          children: [
-            Checkbox(
-              value: done,
-              onChanged: (v) =>
-                  setState(() => products[realIndex]['is_completed'] = v),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p['product_name'] ?? '',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      decoration: done ? TextDecoration.lineThrough : null,
-                      color: done
-                          ? scheme.onSurfaceVariant
-                          : scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      if (p['category'] != null) p['category'],
-                      if (p['market'] != null) p['market'],
-                      'x${p['quantity'] ?? 1}',
-                    ].join(' • '),
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant),
-                  ),
-                  if (features.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: features
-                            .map((f) => Chip(
-                                  label: Text(f,
-                                      style: const TextStyle(fontSize: 11)),
-                                  visualDensity: VisualDensity.compact,
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ))
-                            .toList(),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.delete_outline, color: scheme.error),
-              tooltip: 'Sil',
-              onPressed: () => _removeProduct(realIndex),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
