@@ -38,6 +38,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   String _userEmail = '';
 
   final supabase = Supabase.instance.client;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _allAvailableCategories = [];
   late final List<Widget> _pages;
 
@@ -46,7 +47,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     super.initState();
     final swatch = widget.customPrimarySwatch;
     _pages = [
-      HomePage(customPrimarySwatch: swatch),
+      HomePage(
+        customPrimarySwatch: swatch,
+        onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
       MyListsPage(customPrimarySwatch: swatch),
       const AIChatPage(),
       const ProfilePage(),
@@ -168,6 +172,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: _buildDrawer(scheme),
       body: IndexedStack(index: _pageIndex, children: _pages),

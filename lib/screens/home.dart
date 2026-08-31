@@ -11,7 +11,12 @@ import '../theme/app_theme.dart';
 
 class HomePage extends StatefulWidget {
   final MaterialColor customPrimarySwatch;
-  const HomePage({super.key, required this.customPrimarySwatch});
+  final VoidCallback? onMenuTap;
+  const HomePage({
+    super.key,
+    required this.customPrimarySwatch,
+    this.onMenuTap,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -385,6 +390,15 @@ class _HomePageState extends State<HomePage> {
   Widget _header(ColorScheme scheme) {
     return Row(
       children: [
+        if (widget.onMenuTap != null) ...[
+          IconButton(
+            onPressed: widget.onMenuTap,
+            icon: const Icon(Icons.menu_rounded),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 12),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
