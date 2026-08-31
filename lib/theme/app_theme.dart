@@ -8,26 +8,26 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  /// Marka yeşili — mockup'taki buton/FAB/vurgu rengi.
-  static const Color brandGreen = Color(0xFF33A852);
-  static const Color brandGreenDark = Color(0xFF1E7E3E);
+  /// Marka yeşili — mockup'taki buton/FAB/vurgu rengi (canlı çim yeşili).
+  static const Color brandGreen = Color(0xFF22C55E);
+  static const Color brandGreenDark = Color(0xFF16A34A);
 
   /// Açık yeşil zemin — "hero" kartların arkası (Ana Sayfa, AI kartı vb.).
-  static const Color heroGreenBg = Color(0xFFE9F5EC);
+  static const Color heroGreenBg = Color(0xFFE6F8EC);
 
   /// Geriye dönük uyum: bazı eski ekranlar hâlâ `MaterialColor` (shade'li)
   /// bekliyor. Yeni/yeniden yazılan ekranlar `colorScheme` kullanmalı.
-  static const MaterialColor seedSwatch = MaterialColor(0xFF33A852, {
-    50: Color(0xFFE8F6EC),
-    100: Color(0xFFC6E9CF),
-    200: Color(0xFF9FDBAF),
-    300: Color(0xFF77CD8E),
-    400: Color(0xFF59C275),
-    500: Color(0xFF33A852),
-    600: Color(0xFF2C9C49),
-    700: Color(0xFF238D3E),
-    800: Color(0xFF1B7E33),
-    900: Color(0xFF0C6421),
+  static const MaterialColor seedSwatch = MaterialColor(0xFF22C55E, {
+    50: Color(0xFFE7F9EE),
+    100: Color(0xFFC2EFD3),
+    200: Color(0xFF97E5B6),
+    300: Color(0xFF69DB98),
+    400: Color(0xFF44D081),
+    500: Color(0xFF22C55E),
+    600: Color(0xFF1BAE52),
+    700: Color(0xFF149444),
+    800: Color(0xFF0E7A37),
+    900: Color(0xFF064E22),
   });
 
   static const double _radius = 16;

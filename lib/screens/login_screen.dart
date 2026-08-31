@@ -428,91 +428,139 @@ class _GroceryArtwork extends StatelessWidget {
 class _GroceryPainter extends CustomPainter {
   const _GroceryPainter();
 
+  // Canlı palet
+  static const _basketLight = Color(0xFF34D471);
+  static const _basketDark = Color(0xFF15A34A);
+  static const _basketFold = Color(0xFF5BE38C);
+  static const _tomato = Color(0xFFFF5A5A);
+  static const _orange = Color(0xFFFF9F1C);
+  static const _lemon = Color(0xFFFFE14D);
+  static const _greenA = Color(0xFF57DD86);
+  static const _greenB = Color(0xFF35C46C);
+
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
+    final cx = w / 2;
     final p = Paint()..isAntiAlias = true;
 
+    void dot(double x, double y, double r, Color c) {
+      p.color = c;
+      canvas.drawCircle(Offset(x, y), r, p);
+    }
+
+    void highlight(double x, double y, double r) {
+      p.color = Colors.white.withValues(alpha: 0.55);
+      canvas.drawCircle(Offset(x, y), r, p);
+    }
+
     // Zemin gölgesi
-    p.color = Colors.black.withValues(alpha: 0.08);
+    p.color = Colors.black.withValues(alpha: 0.07);
     canvas.drawOval(
-      Rect.fromCenter(center: Offset(w / 2, h - 14), width: 150, height: 26),
+      Rect.fromCenter(center: Offset(cx, h - 12), width: 140, height: 22),
       p,
     );
 
-    // Arka yapraklar (sepetin ağzından çıkan yeşillik)
-    void leaf(double cx, double cy, double r, Color c) {
-      p.color = c;
-      canvas.drawCircle(Offset(cx, cy), r, p);
+    // Orta yeşillik (brokoli / marul demeti)
+    dot(cx - 6, 44, 15, _greenB);
+    dot(cx + 12, 46, 13, _greenA);
+    dot(cx - 20, 50, 12, _greenA);
+    dot(cx + 2, 34, 11, _greenB);
+
+    // İnce filizler
+    p.color = _greenA;
+    for (final a in [-0.5, -0.1, 0.3]) {
+      canvas.save();
+      canvas.translate(cx, 40);
+      canvas.rotate(a);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            const Rect.fromLTWH(-3, -26, 6, 26), const Radius.circular(3)),
+        p,
+      );
+      canvas.restore();
     }
 
-    leaf(w / 2 - 14, 44, 20, const Color(0xFF66BB6A));
-    leaf(w / 2 + 10, 40, 17, const Color(0xFF81C784));
-    leaf(w / 2 + 2, 30, 13, const Color(0xFF4CAF50));
+    // Domates (sol)
+    dot(cx - 36, 56, 16, _tomato);
+    highlight(cx - 42, 50, 4);
+    // Portakal (sağ)
+    dot(cx + 38, 54, 15, _orange);
+    highlight(cx + 32, 48, 4);
+    // Limon (orta-alt)
+    dot(cx + 10, 62, 11, _lemon);
+    highlight(cx + 6, 58, 3);
 
-    // Meyveler (rim üstünde)
-    p.color = const Color(0xFFEF5350); // domates/elma
-    canvas.drawCircle(Offset(w / 2 - 34, 58), 16, p);
-    p.color = const Color(0xFFFFB300); // portakal
-    canvas.drawCircle(Offset(w / 2 + 34, 56), 15, p);
-    p.color = const Color(0xFFFFD54F); // limon
-    canvas.drawCircle(Offset(w / 2 + 8, 62), 12, p);
-
-    // Havuç
-    final carrotPath = Path()
-      ..moveTo(w / 2 + 46, 44)
-      ..lineTo(w / 2 + 58, 50)
-      ..lineTo(w / 2 + 44, 74)
+    // Havuç (sağ-üstten çıkan)
+    canvas.save();
+    canvas.translate(cx + 50, 56);
+    canvas.rotate(0.5);
+    p.color = _orange;
+    final carrot = Path()
+      ..moveTo(-8, -14)
+      ..lineTo(8, -14)
+      ..lineTo(0, 20)
       ..close();
-    p.color = const Color(0xFFFB8C00);
-    canvas.drawPath(carrotPath, p);
-    p.color = const Color(0xFF66BB6A);
-    canvas.drawCircle(Offset(w / 2 + 50, 42), 5, p);
+    canvas.drawPath(carrot, p);
+    p.color = _greenA;
+    canvas.drawCircle(const Offset(-3, -16), 4, p);
+    canvas.drawCircle(const Offset(4, -16), 4, p);
+    canvas.restore();
 
-    // Sepet ağzı (rim)
-    final rimRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w / 2 - 62, 66, 124, 20),
-      const Radius.circular(10),
+    // Sepet ağzı (kıvrık kenar)
+    p.color = _basketDark;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(cx - 64, 64, 128, 22),
+        const Radius.circular(11),
+      ),
+      p,
     );
-    p.color = const Color(0xFF2E7D32);
-    canvas.drawRRect(rimRect, p);
 
     // Sepet gövdesi (yukarı doğru genişleyen)
     final body = Path()
-      ..moveTo(w / 2 - 58, 80)
-      ..lineTo(w / 2 + 58, 80)
-      ..lineTo(w / 2 + 44, 150)
-      ..lineTo(w / 2 - 44, 150)
+      ..moveTo(cx - 60, 82)
+      ..lineTo(cx + 60, 82)
+      ..lineTo(cx + 46, 150)
+      ..lineTo(cx - 46, 150)
       ..close();
     p.shader = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [Color(0xFF43A047), Color(0xFF2E7D32)],
-    ).createShader(Rect.fromLTWH(w / 2 - 58, 80, 116, 70));
+      colors: [_basketLight, _basketDark],
+    ).createShader(Rect.fromLTWH(cx - 60, 82, 120, 68));
     canvas.drawPath(body, p);
     p.shader = null;
 
-    // Sepet dikey çizgileri
-    p.color = Colors.white.withValues(alpha: 0.18);
-    p.strokeWidth = 4;
-    p.style = PaintingStyle.stroke;
-    for (final dx in [-28.0, 0.0, 28.0]) {
-      canvas.drawLine(
-        Offset(w / 2 + dx, 86),
-        Offset(w / 2 + dx * 0.78, 148),
+    // Ön kıvrım vurgusu
+    p.color = _basketFold;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(cx - 58, 82, 116, 9),
+        const Radius.circular(6),
+      ),
+      p,
+    );
+
+    // Dikey örgü çizgileri
+    p.color = Colors.white.withValues(alpha: 0.16);
+    for (final dx in [-30.0, -10.0, 10.0, 30.0]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(cx + dx - 2.5, 94, 5, 50),
+          const Radius.circular(3),
+        ),
         p,
       );
     }
-    p.style = PaintingStyle.fill;
 
-    // Dekoratif küçük yapraklar / noktalar
-    p.color = const Color(0xFF81C784);
-    canvas.drawCircle(const Offset(28, 40), 6, p);
-    canvas.drawCircle(Offset(w - 26, 90), 5, p);
-    p.color = const Color(0xFFFFCC80);
-    canvas.drawCircle(Offset(w - 34, 34), 4, p);
-    canvas.drawCircle(const Offset(34, 104), 4, p);
+    // Köşe dekorları
+    dot(26, 44, 6, _greenA);
+    dot(w - 24, 92, 5, _greenA);
+    p.color = const Color(0xFFFFD08A);
+    canvas.drawCircle(Offset(w - 30, 36), 4, p);
+    canvas.drawCircle(const Offset(34, 108), 4, p);
   }
 
   @override
