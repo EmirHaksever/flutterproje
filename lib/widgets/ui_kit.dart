@@ -1,29 +1,27 @@
 import 'package:flutter/material.dart';
 
-/// Mockup boyunca tekrar eden küçük yapı taşları. Tek yerde tutuyoruz ki
+import '../theme/app_theme.dart';
+
+/// Tasarım taslağındaki tekrar eden yapı taşları. Tek yerde tutuyoruz ki
 /// tüm ekranlarda birebir aynı görünsünler.
 
 /// "%65" yazan dairesel ilerleme rozeti.
-/// Ana Sayfa hero kartı, Listelerim kartları, Liste Detayı başlığı vb.
 class PercentRing extends StatelessWidget {
   const PercentRing({
     super.key,
     required this.value,
-    this.size = 52,
-    this.stroke = 5,
-    this.color,
+    this.size = 54,
+    this.stroke = 4,
   });
 
   /// 0.0 – 1.0 arası tamamlanma oranı.
   final double value;
   final double size;
   final double stroke;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final c = color ?? scheme.primary;
     final pct = (value.clamp(0.0, 1.0) * 100).round();
     return SizedBox(
       width: size,
@@ -38,15 +36,15 @@ class PercentRing extends StatelessWidget {
               value: value.clamp(0.0, 1.0),
               strokeWidth: stroke,
               strokeCap: StrokeCap.round,
-              backgroundColor: scheme.outlineVariant.withValues(alpha: 0.4),
-              valueColor: AlwaysStoppedAnimation(c),
+              backgroundColor: AppTheme.heroGreenBg,
+              valueColor: AlwaysStoppedAnimation(scheme.primary),
             ),
           ),
           Text(
             '%$pct',
             style: TextStyle(
-              fontSize: size * 0.26,
-              fontWeight: FontWeight.w700,
+              fontSize: size * 0.2 + 1,
+              fontWeight: FontWeight.w800,
               color: scheme.onSurface,
             ),
           ),
@@ -57,19 +55,17 @@ class PercentRing extends StatelessWidget {
 }
 
 /// Kenarlıklı beyaz kutu: büyük sayı + küçük etiket.
-/// Ana Sayfa (3'lü), İstatistikler (3'lü), Profil (4'lü) satırlarında.
+/// Row içinde `Expanded` ile kullanılır.
 class MiniStatCard extends StatelessWidget {
   const MiniStatCard({
     super.key,
     required this.value,
     required this.label,
-    this.icon,
     this.onTap,
   });
 
   final String value;
   final String label;
-  final IconData? icon;
   final VoidCallback? onTap;
 
   @override
@@ -77,37 +73,33 @@ class MiniStatCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(15),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         decoration: BoxDecoration(
           color: scheme.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: scheme.outlineVariant),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
-              Icon(icon, size: 18, color: scheme.primary),
-              const SizedBox(height: 6),
-            ],
             Text(
               value,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: scheme.onSurface,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               label,
               textAlign: TextAlign.center,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 11,
                 color: scheme.onSurfaceVariant,
               ),
             ),
@@ -118,7 +110,7 @@ class MiniStatCard extends StatelessWidget {
   }
 }
 
-/// Bölüm başlığı: kalın başlık + sağda isteğe bağlı "Tümü ›" aksiyonu.
+/// Bölüm başlığı: kalın başlık + sağda isteğe bağlı yeşil aksiyon metni.
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
     super.key,
@@ -137,36 +129,199 @@ class SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
+          Flexible(
             child: Text(
               title,
               style: TextStyle(
                 fontSize: 17,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
                 color: scheme.onSurface,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (actionLabel != null)
             GestureDetector(
               onTap: onAction,
-              child: Row(
-                children: [
-                  Text(
-                    actionLabel!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: scheme.primary,
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, size: 18, color: scheme.primary),
-                ],
+              child: Text(
+                actionLabel!,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.primary,
+                ),
               ),
             ),
         ],
       ),
     );
   }
+}
+
+/// Liste kartı: ad + "x / y ürün" + ilerleme çubuğu + sağda %-halka.
+class ListCard extends StatelessWidget {
+  const ListCard({
+    super.key,
+    required this.title,
+    required this.done,
+    required this.total,
+    this.subtitle,
+    this.onTap,
+  });
+
+  final String title;
+  final int done;
+  final int total;
+  final Widget? subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final ratio = total == 0 ? 0.0 : done / total;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 5),
+                    subtitle ??
+                        Text(
+                          '$done / $total ürün',
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                        ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        minHeight: 5,
+                        backgroundColor: AppTheme.heroGreenBg,
+                        color: scheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 15),
+              PercentRing(value: ratio),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Yatay kategori kartı: emoji + ad (+ isteğe bağlı adet).
+class CategoryCard extends StatelessWidget {
+  const CategoryCard({
+    super.key,
+    required this.title,
+    this.emoji,
+    this.icon,
+    this.count,
+    this.onTap,
+  });
+
+  final String title;
+  final String? emoji;
+  final IconData? icon;
+  final int? count;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 86,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (emoji != null)
+              Text(emoji!, style: const TextStyle(fontSize: 24))
+            else
+              Icon(icon ?? Icons.category_outlined,
+                  size: 24, color: scheme.primary),
+            const SizedBox(height: 5),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (count != null && count! > 0)
+              Text('$count ürün',
+                  style: TextStyle(
+                      fontSize: 9, color: scheme.onSurfaceVariant)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Kategori adına göre emoji tahmini (tasarım taslağındaki gibi).
+String categoryEmoji(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('meyve')) return '🍎';
+  if (n.contains('sebze')) return '🥦';
+  if (n.contains('süt')) return '🥛';
+  if (n.contains('et') || n.contains('balık') || n.contains('tavuk')) {
+    return '🥩';
+  }
+  if (n.contains('temizlik')) return '🧴';
+  if (n.contains('ekmek') || n.contains('fırın') || n.contains('unlu')) {
+    return '🍞';
+  }
+  if (n.contains('içecek')) return '🥤';
+  if (n.contains('kahvalt')) return '🍳';
+  if (n.contains('bebek')) return '🍼';
+  if (n.contains('atıştır') || n.contains('cips')) return '🍿';
+  if (n.contains('dondur')) return '🧊';
+  if (n.contains('bakliyat') || n.contains('kuru')) return '🫘';
+  if (n.contains('kişisel') || n.contains('bakım')) return '🧼';
+  if (n.contains('kırtasiye')) return '✏️';
+  if (n.contains('elektronik')) return '🔌';
+  return '🛒';
 }

@@ -1,36 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-/// Uygulamanın tema sistemi — Material 3, tek "seed" renkten türetilmiş
-/// uyumlu açık/koyu paletler ve tutarlı şekil/boşluk kuralları.
+/// Uygulamanın tema sistemi — Material 3 + Poppins.
 ///
-/// Tasarım referansı: 12 ekranlık mockup seti (yeşil marka, beyaz kartlar,
-/// beyaz app bar, alt navigasyonda ortada yeşil FAB).
+/// Renk/ölçü değerleri, kullanıcının onayladığı tasarım taslağından alındı
+/// (yeşil #16A34A, greenSoft #EAF8EE, Poppins, 16-18px köşeler, ince gri
+/// kenarlıklı beyaz kartlar, şeffaf app bar).
 class AppTheme {
   AppTheme._();
 
-  /// Marka yeşili — mockup'taki buton/FAB/vurgu rengi (canlı çim yeşili).
-  static const Color brandGreen = Color(0xFF22C55E);
-  static const Color brandGreenDark = Color(0xFF16A34A);
+  // --- Renk paleti (tasarım taslağı) --------------------------------------
+  static const Color brandGreen = Color(0xFF16A34A);
+  static const Color brandGreenDark = Color(0xFF15803D);
+  static const Color heroGreenBg = Color(0xFFEAF8EE); // greenSoft
 
-  /// Açık yeşil zemin — "hero" kartların arkası (Ana Sayfa, AI kartı vb.).
-  static const Color heroGreenBg = Color(0xFFE6F8EC);
+  static const Color bgLight = Color(0xFFF8FAF8);
+  static const Color textPrimary = Color(0xFF111827);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color borderLight = Color(0xFFE5E7EB);
 
-  /// Geriye dönük uyum: bazı eski ekranlar hâlâ `MaterialColor` (shade'li)
-  /// bekliyor. Yeni/yeniden yazılan ekranlar `colorScheme` kullanmalı.
-  static const MaterialColor seedSwatch = MaterialColor(0xFF22C55E, {
-    50: Color(0xFFE7F9EE),
-    100: Color(0xFFC2EFD3),
-    200: Color(0xFF97E5B6),
-    300: Color(0xFF69DB98),
-    400: Color(0xFF44D081),
-    500: Color(0xFF22C55E),
-    600: Color(0xFF1BAE52),
-    700: Color(0xFF149444),
-    800: Color(0xFF0E7A37),
-    900: Color(0xFF064E22),
+  static const Color accentOrange = Color(0xFFF59E0B);
+  static const Color accentBlue = Color(0xFF3B82F6);
+  static const Color accentPurple = Color(0xFF8B5CF6);
+
+  /// Geriye dönük uyum: bazı eski ekranlar hâlâ `MaterialColor` bekliyor.
+  static const MaterialColor seedSwatch = MaterialColor(0xFF16A34A, {
+    50: Color(0xFFEAF8EE),
+    100: Color(0xFFCBEBD5),
+    200: Color(0xFFA6DCB8),
+    300: Color(0xFF7FCD9A),
+    400: Color(0xFF54BF7E),
+    500: Color(0xFF16A34A),
+    600: Color(0xFF139443),
+    700: Color(0xFF0F8039),
+    800: Color(0xFF0B6C30),
+    900: Color(0xFF054A20),
   });
 
-  static const double _radius = 16;
+  static const double _radius = 18;
 
   static ThemeData light() => _base(Brightness.light);
   static ThemeData dark() => _base(Brightness.dark);
@@ -42,14 +49,12 @@ class AppTheme {
       seedColor: brandGreen,
       brightness: brightness,
     );
-    // Marka yeşilini birebir tuttuğumuz için primary'yi elle sabitliyoruz;
-    // fromSeed onu ton kurallarına göre koyulaştırıyor.
     final scheme = isDark
         ? generated.copyWith(
-            primary: const Color(0xFF4ADE80),
+            primary: const Color(0xFF34D26A),
             onPrimary: const Color(0xFF06230F),
-            primaryContainer: const Color(0xFF10381E),
-            onPrimaryContainer: const Color(0xFFB7F0C6),
+            primaryContainer: const Color(0xFF12331F),
+            onPrimaryContainer: const Color(0xFFBEEDCB),
           )
         : generated.copyWith(
             primary: brandGreen,
@@ -57,27 +62,40 @@ class AppTheme {
             primaryContainer: heroGreenBg,
             onPrimaryContainer: brandGreenDark,
             secondary: brandGreen,
+            surface: Colors.white,
+            onSurface: textPrimary,
+            onSurfaceVariant: textSecondary,
+            outlineVariant: borderLight,
           );
 
     final surface = isDark ? scheme.surface : Colors.white;
     final onSurface = scheme.onSurface;
 
+    final baseText = isDark
+        ? ThemeData(brightness: Brightness.dark).textTheme
+        : ThemeData(brightness: Brightness.light).textTheme;
+    final textTheme = GoogleFonts.poppinsTextTheme(baseText).apply(
+      bodyColor: onSurface,
+      displayColor: onSurface,
+    );
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor:
-          isDark ? scheme.surface : const Color(0xFFF6F7F9),
+      textTheme: textTheme,
+      scaffoldBackgroundColor: isDark ? scheme.surface : bgLight,
       primaryColor: scheme.primary,
       appBarTheme: AppBarTheme(
-        backgroundColor: surface,
+        backgroundColor: isDark ? scheme.surface : bgLight,
         foregroundColor: onSurface,
         elevation: 0,
-        scrolledUnderElevation: 0.5,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.poppins(
           color: onSurface,
           fontSize: 20,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
         iconTheme: IconThemeData(color: onSurface),
       ),
@@ -87,7 +105,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_radius),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          side: BorderSide(color: scheme.outlineVariant),
         ),
         margin: const EdgeInsets.symmetric(vertical: 6),
       ),
@@ -95,62 +113,70 @@ class AppTheme {
         filled: true,
         fillColor: isDark ? scheme.surfaceContainerHighest : Colors.white,
         hintStyle: TextStyle(color: scheme.onSurfaceVariant),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: scheme.primary, width: 2),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
-          textStyle:
-              const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.poppins(
+              fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          textStyle:
-              const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          textStyle: GoogleFonts.poppins(
+              fontSize: 15, fontWeight: FontWeight.w700),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: scheme.primary),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: onSurface,
+          side: BorderSide(color: scheme.outlineVariant),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         elevation: 2,
-        shape: const CircleBorder(),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface,
-        indicatorColor: Colors.transparent,
+        indicatorColor: heroGreenBg,
         elevation: 0,
-        height: 64,
+        height: 72,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
+          (states) => GoogleFonts.poppins(
             fontSize: 11,
             fontWeight: FontWeight.w500,
             color: states.contains(WidgetState.selected)
@@ -170,19 +196,20 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       dividerTheme: DividerThemeData(
-        color: scheme.outlineVariant.withValues(alpha: 0.6),
+        color: scheme.outlineVariant,
         space: 1,
       ),
       chipTheme: ChipThemeData(
+        backgroundColor: surface,
         shape: const StadiumBorder(),
         side: BorderSide(color: scheme.outlineVariant),
       ),
       listTileTheme: const ListTileThemeData(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderRadius: BorderRadius.all(Radius.circular(14)),
         ),
       ),
     );

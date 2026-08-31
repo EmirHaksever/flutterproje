@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/app_theme.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,8 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isLogin = true;
   bool _obscurePassword = true;
-
-  static const Color _navy = Color(0xFF1F2D5A);
 
   @override
   void initState() {
@@ -145,456 +145,170 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headlineDark = isDark ? scheme.onSurface : _navy;
-    final bg = isDark ? scheme.surface : const Color(0xFFF1F8F3);
 
     return Scaffold(
-      backgroundColor: bg,
-      body: Stack(
-        children: [
-          // Arka plan dekoru — yumuşak yeşil dalgalar
-          Positioned(
-            top: -120,
-            right: -100,
-            child: _blob(220, scheme.primary.withValues(alpha: isDark ? 0.10 : 0.12)),
-          ),
-          Positioned(
-            bottom: -140,
-            left: -110,
-            child: _blob(260, scheme.primary.withValues(alpha: isDark ? 0.08 : 0.10)),
-          ),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 24),
-                      const _GroceryArtwork(),
-                      const SizedBox(height: 22),
-                      _headline(headlineDark, scheme.primary),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Paylaşımlı listeler, akıllı öneriler ve '
-                        'istatistiklerle her şey elinin altında.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          height: 1.45,
-                          color: scheme.onSurfaceVariant,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                children: [
+                  const SizedBox(height: 32),
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: AppTheme.heroGreenBg,
+                      borderRadius: BorderRadius.circular(35),
+                    ),
+                    child: Icon(Icons.shopping_basket_outlined,
+                        size: 60, color: scheme.primary),
+                  ),
+                  const SizedBox(height: 24),
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                        color: scheme.onSurface,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Alışverişini kolaylaştır,\n'),
+                        TextSpan(
+                          text: 'zaman kazan!',
+                          style: TextStyle(color: scheme.primary),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Paylaşımlı listeler, akıllı öneriler\n'
+                    've alışveriş istatistikleri.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 35),
+                  TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.email_outlined),
+                      hintText: 'E-posta adresiniz',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    onSubmitted: (_) => _isLoading ? null : _authUser(),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined),
+                        onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword),
                       ),
-                      const SizedBox(height: 26),
-                      _field(
-                        controller: _emailController,
-                        hint: 'E-posta adresiniz',
-                        icon: Icons.mail_outline,
-                        keyboardType: TextInputType.emailAddress,
+                      hintText: 'Şifreniz',
+                    ),
+                  ),
+                  if (_isLogin)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _forgotPassword,
+                        child: const Text('Şifremi Unuttum?'),
                       ),
-                      const SizedBox(height: 14),
-                      _field(
-                        controller: _passwordController,
-                        hint: 'Şifreniz',
-                        icon: Icons.lock_outline,
-                        obscure: _obscurePassword,
-                        onSubmitted: (_) => _isLoading ? null : _authUser(),
-                        suffix: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                          onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
-                        ),
-                      ),
-                      if (_isLogin)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: _forgotPassword,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              minimumSize: Size.zero,
-                              tapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text('Şifremi Unuttum?'),
-                          ),
-                        )
-                      else
-                        const SizedBox(height: 18),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: FilledButton(
-                          onPressed: _isLoading ? null : _authUser,
-                          style: FilledButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            textStyle: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.4,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(_isLogin ? 'Giriş Yap' : 'Kayıt Ol'),
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      _orDivider(scheme),
-                      const SizedBox(height: 18),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _SocialButton(
-                            onTap: () =>
-                                _snack('Google ile giriş yakında eklenecek.'),
-                            child: const Text(
-                              'G',
-                              style: TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF4285F4),
+                    )
+                  else
+                    const SizedBox(height: 8),
+                  const SizedBox(height: 5),
+                  SizedBox(
+                    height: 52,
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _authUser,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: Colors.white,
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 18),
-                          _SocialButton(
-                            onTap: () =>
-                                _snack('Apple ile giriş yakında eklenecek.'),
-                            child: Icon(Icons.apple,
-                                size: 26, color: scheme.onSurface),
-                          ),
-                          const SizedBox(width: 18),
-                          _SocialButton(
-                            onTap: () => FocusScope.of(context).unfocus(),
-                            child: Icon(Icons.mail_outline,
-                                size: 23, color: scheme.primary),
-                          ),
-                        ],
+                            )
+                          : Text(_isLogin ? 'Giriş Yap' : 'Kayıt Ol'),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('veya',
+                            style:
+                                TextStyle(color: scheme.onSurfaceVariant)),
                       ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        _snack('Google ile giriş yakında eklenecek.'),
+                    icon: const Icon(Icons.g_mobiledata, size: 28),
+                    label: const Text('Google ile devam et'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _isLogin = !_isLogin);
+                      _passwordController.clear();
+                    },
+                    child: Text.rich(
+                      TextSpan(
                         children: [
-                          Text(
-                            _isLogin
+                          TextSpan(
+                            text: _isLogin
                                 ? 'Hesabın yok mu? '
                                 : 'Zaten hesabın var mı? ',
                             style:
                                 TextStyle(color: scheme.onSurfaceVariant),
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() => _isLogin = !_isLogin);
-                              _passwordController.clear();
-                            },
-                            child: Text(
-                              _isLogin ? 'Kayıt Ol' : 'Giriş Yap',
-                              style: TextStyle(
-                                color: scheme.primary,
-                                fontWeight: FontWeight.w800,
-                              ),
+                          TextSpan(
+                            text: _isLogin ? 'Kayıt Ol' : 'Giriş Yap',
+                            style: TextStyle(
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _blob(double size, Color color) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
-
-  Widget _headline(Color darkColor, Color accent) {
-    return RichText(
-      textAlign: TextAlign.center,
-      text: TextSpan(
-        style: TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.w800,
-          height: 1.22,
-          color: darkColor,
         ),
-        children: [
-          const TextSpan(text: 'Alışverişini kolaylaştır,\n'),
-          TextSpan(text: 'zaman kazan!', style: TextStyle(color: accent)),
-        ],
-      ),
-    );
-  }
-
-  Widget _field({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    TextInputType? keyboardType,
-    Widget? suffix,
-    void Function(String)? onSubmitted,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscure,
-        keyboardType: keyboardType,
-        textInputAction:
-            obscure ? TextInputAction.done : TextInputAction.next,
-        onSubmitted: onSubmitted,
-        decoration: InputDecoration(
-          hintText: hint,
-          prefixIcon: Icon(icon, color: scheme.onSurfaceVariant),
-          suffixIcon: suffix,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: scheme.outlineVariant),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: scheme.outlineVariant),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _orDivider(ColorScheme scheme) {
-    final line = Expanded(
-      child: Divider(color: scheme.outlineVariant, thickness: 1),
-    );
-    return Row(
-      children: [
-        line,
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text('veya',
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
-        ),
-        line,
-      ],
-    );
-  }
-}
-
-/// Renkli "market sepeti" illüstrasyonu — CustomPaint ile çizildi.
-class _GroceryArtwork extends StatelessWidget {
-  const _GroceryArtwork();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 220,
-      height: 176,
-      child: CustomPaint(painter: _GroceryPainter()),
-    );
-  }
-}
-
-class _GroceryPainter extends CustomPainter {
-  const _GroceryPainter();
-
-  // Canlı palet
-  static const _basketLight = Color(0xFF34D471);
-  static const _basketDark = Color(0xFF15A34A);
-  static const _basketFold = Color(0xFF5BE38C);
-  static const _tomato = Color(0xFFFF5A5A);
-  static const _orange = Color(0xFFFF9F1C);
-  static const _lemon = Color(0xFFFFE14D);
-  static const _greenA = Color(0xFF57DD86);
-  static const _greenB = Color(0xFF35C46C);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    final p = Paint()..isAntiAlias = true;
-
-    void dot(double x, double y, double r, Color c) {
-      p.color = c;
-      canvas.drawCircle(Offset(x, y), r, p);
-    }
-
-    void highlight(double x, double y, double r) {
-      p.color = Colors.white.withValues(alpha: 0.5);
-      canvas.drawCircle(Offset(x, y), r, p);
-    }
-
-    // Zemin gölgesi
-    p.color = Colors.black.withValues(alpha: 0.06);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(cx, h - 10), width: 150, height: 22),
-      p,
-    );
-
-    // --- Çantayı dolduran ürünler (rim'in arkasında/üstünde) --------------
-    // Uzun yeşillikler (marul yaprakları) — sepetin arkasından yukarı
-    p.color = _greenA;
-    for (final a in [-0.5, -0.18, 0.16, 0.42]) {
-      canvas.save();
-      canvas.translate(cx, 62);
-      canvas.rotate(a);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            const Rect.fromLTWH(-5, -44, 10, 46), const Radius.circular(5)),
-        p,
-      );
-      canvas.restore();
-    }
-    // Brokoli demeti (sol)
-    dot(cx - 34, 46, 13, _greenB);
-    dot(cx - 22, 40, 10, _greenA);
-    // Domates (sol-orta)
-    dot(cx - 30, 58, 15, _tomato);
-    highlight(cx - 36, 52, 4);
-    // Portakal (sağ)
-    dot(cx + 32, 54, 15, _orange);
-    highlight(cx + 26, 48, 4);
-    // Limon (orta)
-    dot(cx + 6, 62, 11, _lemon);
-    highlight(cx + 2, 58, 3);
-    // Havuç (sağdan sarkan)
-    canvas.save();
-    canvas.translate(cx + 46, 46);
-    canvas.rotate(0.5);
-    p.color = _orange;
-    canvas.drawPath(
-      Path()
-        ..moveTo(-8, -15)
-        ..lineTo(8, -15)
-        ..lineTo(0, 20)
-        ..close(),
-      p,
-    );
-    p.color = _greenA;
-    canvas.drawCircle(const Offset(-4, -17), 4, p);
-    canvas.drawCircle(const Offset(5, -17), 4, p);
-    canvas.restore();
-
-    // --- Sepet ---------------------------------------------------------
-    // Ağız (katlanmış kenar)
-    p.color = _basketDark;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 64, 66, 128, 20),
-        const Radius.circular(10),
-      ),
-      p,
-    );
-
-    // Gövde — yukarı doğru genişleyen
-    final body = Path()
-      ..moveTo(cx - 60, 82)
-      ..lineTo(cx + 60, 82)
-      ..lineTo(cx + 46, 150)
-      ..lineTo(cx - 46, 150)
-      ..close();
-    p.shader = const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [_basketLight, _basketDark],
-    ).createShader(Rect.fromLTWH(cx - 60, 82, 120, 68));
-    canvas.drawPath(body, p);
-    p.shader = null;
-
-    // Ön kıvrım vurgusu
-    p.color = _basketFold;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 58, 82, 116, 9),
-        const Radius.circular(6),
-      ),
-      p,
-    );
-
-    // Dikey örgü çizgileri
-    p.color = Colors.white.withValues(alpha: 0.16);
-    for (final dx in [-30.0, -10.0, 10.0, 30.0]) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(cx + dx - 2.5, 94, 5, 50),
-          const Radius.circular(3),
-        ),
-        p,
-      );
-    }
-
-    // --- Dekoratif küçük yapraklar / noktalar --------------------------
-    dot(24, 40, 6, _greenA);
-    dot(w - 22, 96, 5, _greenA);
-    p.color = const Color(0xFFFFD08A);
-    canvas.drawCircle(Offset(w - 28, 34), 4, p);
-    canvas.drawCircle(const Offset(32, 110), 4, p);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GroceryPainter oldDelegate) => false;
-}
-
-/// Beyaz, gölgeli, dairesel sosyal giriş butonu.
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({required this.child, required this.onTap});
-
-  final Widget child;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 54,
-        height: 54,
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          shape: BoxShape.circle,
-          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Center(child: child),
       ),
     );
   }

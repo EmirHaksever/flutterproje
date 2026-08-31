@@ -21,6 +21,7 @@ dependencies:
   flutter_dotenv: ^5.0.2
   http: ^1.4.0
   dropdown_button2: ^2.3.9
+  google_fonts: ^8.2.1
 
 dev_dependencies:
   flutter_test:
