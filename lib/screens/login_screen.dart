@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/app_theme.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,17 +18,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isLogin = true;
   bool _obscurePassword = true;
-  String _language = 'tr'; // Varsayılan dil Türkçe
-  bool _rememberMe = false; // Yeni: Beni Hatırla durumu
-
-  // Vurgu rengi artık temadan geliyor (koyu modda da doğru).
-  Color get _loginAccentColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
     super.initState();
-    _loadRememberMePreference(); // Beni Hatırla tercihini yükle
-    // Navigasyon initState içinde doğrudan çağrılamaz; ilk kareden sonra çalıştır.
+    _loadRememberedEmail();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAutoLogin());
   }
 
@@ -37,29 +33,18 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // "Beni Hatırla" tercihini ve (yalnızca) e-postayı yükle.
-  // Şifre HİÇBİR ZAMAN saklanmaz — Supabase oturumu zaten güvenli tutuluyor.
-  Future<void> _loadRememberMePreference() async {
+  // Yalnızca e-postayı hazır getirir. Şifre HİÇBİR ZAMAN saklanmaz —
+  // Supabase oturumu zaten güvenli tutuluyor.
+  Future<void> _loadRememberedEmail() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Eski sürümlerden kalmış olabilecek düz-metin şifreyi temizle (tek seferlik göç).
-    await prefs.remove('password');
-
+    await prefs.remove('password'); // eski sürüm temizliği
     if (!mounted) return;
-    setState(() {
-      _rememberMe = prefs.getBool('rememberMe') ?? false;
-      if (_rememberMe) {
-        _emailController.text = prefs.getString('email') ?? '';
-      }
-    });
+    setState(() => _emailController.text = prefs.getString('email') ?? '');
   }
 
-  // Otomatik giriş yalnızca geçerli bir Supabase oturumu varsa yapılır.
-  // Supabase SDK oturumu güvenli depoda tutar ve access token'ı otomatik yeniler.
   void _checkAutoLogin() {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null && mounted) {
-      debugPrint('Aktif Supabase oturumu var, ana sayfaya yönlendiriliyor.');
       Navigator.pushReplacementNamed(context, '/home');
     }
   }
@@ -81,19 +66,10 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (response.session != null && mounted) {
-          // "Beni Hatırla" yalnızca e-postayı bir sonraki açılışta hazır getirir.
-          // Şifre asla saklanmaz; oturumu Supabase SDK güvenli şekilde yönetir.
-          if (_rememberMe) {
-            await prefs.setString('email', email);
-            await prefs.setBool('rememberMe', true);
-          } else {
-            await prefs.remove('email');
-            await prefs.setBool('rememberMe', false);
-          }
+          await prefs.setString('email', email);
           Navigator.pushReplacementNamed(context, '/home');
         }
       } else {
-        // Kayıt olma
         final signUpResponse = await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
@@ -102,300 +78,345 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           if (signUpResponse.user != null) {
             if (signUpResponse.session == null) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(_language == 'tr'
-                    ? 'Kayıt başarılı! Lütfen e-postanızı kontrol edin ve hesabınızı onaylayın. Onayladıktan sonra giriş yapabilirsiniz.'
-                    : 'Registration successful! Please check your email to confirm your account. You can log in after confirmation.'),
-                backgroundColor: _loginAccentColor,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ));
+              _snack(
+                'Kayıt başarılı! E-postanı kontrol edip hesabını onayla, '
+                'sonra giriş yapabilirsin.',
+              );
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(_language == 'tr'
-                    ? 'Kayıt başarılı! Oturum açılıyor...'
-                    : 'Registration successful! Logging in...'),
-                backgroundColor: _loginAccentColor,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ));
+              _snack('Kayıt başarılı! Oturum açılıyor...');
               Navigator.pushReplacementNamed(context, '/home');
             }
-            setState(() {
-              _isLogin = true;
-            });
+            setState(() => _isLogin = true);
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(_language == 'tr'
-                  ? 'Kayıt olurken bir sorun oluştu. Lütfen bilgilerinizi kontrol edin ve tekrar deneyin.'
-                  : 'An issue occurred during registration. Please check your details and try again.'),
-              backgroundColor: Colors.red.shade400,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ));
+            _snack('Kayıt sırasında bir sorun oluştu. Bilgilerini kontrol et.',
+                error: true);
           }
         }
       }
     } on AuthException catch (e) {
       if (!mounted) return;
-      final errorMessage = _translateError(e.message);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(errorMessage),
-        backgroundColor: Colors.red.shade400,
-        behavior: SnackBarBehavior.floating, // Daha modern görünüm
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
+      _snack(_translateError(e.message), error: true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(_language == 'tr'
-            ? 'Beklenmedik bir hata oluştu. Lütfen tekrar deneyin.'
-            : 'An unexpected error occurred. Please try again.'),
-        backgroundColor: Colors.red.shade400,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
+      _snack('Beklenmedik bir hata oluştu. Lütfen tekrar dene.', error: true);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      _snack('Önce e-posta adresini yaz, sonra sıfırlama bağlantısı gönderelim.',
+          error: true);
+      return;
+    }
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      _snack('Şifre sıfırlama bağlantısı $email adresine gönderildi.');
+    } catch (_) {
+      _snack('Bağlantı gönderilemedi. Lütfen tekrar dene.', error: true);
+    }
+  }
+
+  void _snack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    final scheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? scheme.error : scheme.primary,
+    ));
   }
 
   String _translateError(String message) {
     final errors = {
-      'Invalid login credentials': {
-        'tr': 'Geçersiz e-posta veya şifre.',
-        'en': 'Invalid email or password.'
-      },
-      'User already registered': {
-        'tr': 'Bu e-posta ile zaten kayıt olunmuş.',
-        'en': 'This email is already registered.'
-      },
-      'Email not confirmed': {
-        'tr': 'E-posta adresiniz henüz onaylanmamış. Lütfen e-postanızı kontrol edin.',
-        'en': 'Email address is not confirmed yet. Please check your email.'
-      },
-      'Password should be at least': {
-        'tr': 'Şifre en az 6 karakter olmalıdır.',
-        'en': 'Password must be at least 6 characters.'
-      },
-      'network-request-failed': {
-        'tr': 'İnternet bağlantınızı kontrol edin.',
-        'en': 'Check your internet connection.'
-      },
-      'Invalid email format': {
-        'tr': 'Geçersiz e-posta formatı.',
-        'en': 'Invalid email format.'
-      },
-      'Unable to connect to the server': { // Supabase bağlantı hatası için eklendi
-        'tr': 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.',
-        'en': 'Unable to connect to the server. Check your internet connection.'
-      },
-       'User already confirmed': { // Supabase'in "User already confirmed" hatası için eklendi
-        'tr': 'Bu e-posta adresi zaten onaylanmış.',
-        'en': 'This email address is already confirmed.'
-      },
+      'Invalid login credentials': 'Geçersiz e-posta veya şifre.',
+      'User already registered': 'Bu e-posta ile zaten kayıt olunmuş.',
+      'Email not confirmed':
+          'E-posta adresin henüz onaylanmamış. Lütfen e-postanı kontrol et.',
+      'Password should be at least': 'Şifre en az 6 karakter olmalı.',
+      'network-request-failed': 'İnternet bağlantını kontrol et.',
+      'Invalid email format': 'Geçersiz e-posta formatı.',
+      'Unable to connect to the server':
+          'Sunucuya bağlanılamadı. İnternet bağlantını kontrol et.',
+      'User already confirmed': 'Bu e-posta adresi zaten onaylanmış.',
     };
-
-    for (var key in errors.keys) {
-      if (message.contains(key)) {
-        return errors[key]?[_language] ?? message;
-      }
+    for (final key in errors.keys) {
+      if (message.contains(key)) return errors[key]!;
     }
-
-    return _language == 'tr' ? 'Bir hata oluştu: $message' : 'Error: $message';
-  }
-
-  // Arka plan degradesi — tema ana renginin çok hafif tonları (koyu mod uyumlu).
-  List<Color> _getBackgroundGradientColors() {
-    final scheme = Theme.of(context).colorScheme;
-    return [
-      scheme.surface,
-      Color.lerp(scheme.surface, scheme.primary, 0.12)!,
-    ];
+    return 'Bir hata oluştu: $message';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isTurkish = _language == 'tr';
-    final primaryColor = Theme.of(context).primaryColor; 
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      // Arka planı degrade ile kapla
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: _getBackgroundGradientColors(),
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Card( // Giriş formu için kart yapısı
-                elevation: 10, // Hafif yükseltilmiş
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20), // Yuvarlak köşeler
-                ),
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min, // İçeriğe göre boyutlan
-                    children: [
-                      // Uygulamanızın Logosu veya Başlık
-                      Icon(
-                        Icons.shopping_basket_rounded, // Sepet ikonu
-                        size: 80,
-                        color: _loginAccentColor, // Vurgu rengi kullanıldı
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _LoginArtwork(),
+                  const SizedBox(height: 24),
+                  _headline(scheme),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Paylaşımlı listeler, akıllı öneriler ve istatistiklerle '
+                    'her şey tek elde.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      height: 1.4,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      hintText: 'E-posta adresiniz',
+                      prefixIcon: Icon(Icons.mail_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    onSubmitted: (_) => _isLoading ? null : _authUser(),
+                    decoration: InputDecoration(
+                      hintText: 'Şifreniz',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined),
+                        onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _isLogin
-                            ? (isTurkish ? 'Giriş Yap' : 'Login')
-                            : (isTurkish ? 'Kayıt Ol' : 'Register'),
-                        style: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurface),
-                      ),
-                      const SizedBox(height: 30),
-
-                      // E-posta Giriş Alanı
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: isTurkish ? 'E-posta' : 'Email',
-                          hintText: 'ornek@email.com',
-                          prefixIcon: Icon(Icons.email_outlined,
-                              color: _loginAccentColor),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Şifre Giriş Alanı
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: isTurkish ? 'Şifre' : 'Password',
-                          hintText: '••••••••',
-                          prefixIcon: Icon(Icons.lock_outline,
-                              color: _loginAccentColor),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10), // Boşluk eklendi
-
-                      // Beni Hatırla Checkbox'ı
-                      if (_isLogin) // Sadece giriş formunda göster
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: CheckboxListTile(
-                            title: Text(
-                              isTurkish ? 'Beni Hatırla' : 'Remember Me',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            value: _rememberMe,
-                            onChanged: (bool? newValue) async {
-                              setState(() {
-                                _rememberMe = newValue ?? false;
-                              });
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setBool('rememberMe', _rememberMe);
-                              if (!_rememberMe) {
-                                await prefs.remove('email');
-                              }
-                            },
-                            controlAffinity: ListTileControlAffinity.leading, // Checkbox solda
-                            contentPadding: EdgeInsets.zero, // İç boşlukları kaldır
-                            activeColor: primaryColor, // Temanın ana rengini kullan
-                          ),
-                        ),
-                      const SizedBox(height: 20), // Ek boşluk
-
-                      // Giriş / Kayıt Butonu
-                      _isLoading
-                          ? CircularProgressIndicator(color: _loginAccentColor) // Vurgu rengi kullanıldı
-                          : ElevatedButton(
-                              onPressed: _authUser,
-                              style: ElevatedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(50),
-                              ),
-                              child: Text(
-                                _isLogin
-                                    ? (isTurkish ? 'Giriş Yap' : 'Login')
-                                    : (isTurkish ? 'Kayıt Ol' : 'Register'),
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                      const SizedBox(height: 20),
-
-                      // Geçiş Butonu (Kayıt Ol / Giriş Yap)
-                      TextButton(
-                        onPressed: () {
-                          setState(() => _isLogin = !_isLogin);
-                          _emailController.clear();
-                          _passwordController.clear();
-                          _rememberMe = false; // Form değiştiğinde "beni hatırla" seçeneğini sıfırla
-                        },
+                    ),
+                  ),
+                  if (_isLogin)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _forgotPassword,
                         style: TextButton.styleFrom(
-                          foregroundColor: _loginAccentColor.withValues(alpha: 0.8), // Vurgu rengi kullanıldı
-                          textStyle: const TextStyle(fontSize: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
+                        child: const Text('Şifremi Unuttum?'),
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _authUser,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(_isLogin ? 'Giriş Yap' : 'Kayıt Ol'),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  _orDivider(scheme),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _SocialButton(
+                        label: 'Google',
                         child: Text(
-                          _isLogin
-                              ? (isTurkish
-                                    ? 'Hesabın yok mu? Kayıt ol'
-                                    : "Don't have an account? Register")
-                              : (isTurkish
-                                    ? 'Zaten hesabın var mı? Giriş yap'
-                                    : 'Already have an account? Login'),
+                          'G',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        onTap: () => _snack(
+                            'Google ile giriş yakında eklenecek.'),
+                      ),
+                      const SizedBox(width: 16),
+                      _SocialButton(
+                        label: 'Apple',
+                        child: Icon(Icons.apple, size: 24, color: scheme.onSurface),
+                        onTap: () =>
+                            _snack('Apple ile giriş yakında eklenecek.'),
+                      ),
+                      const SizedBox(width: 16),
+                      _SocialButton(
+                        label: 'E-posta',
+                        child: Icon(Icons.mail_outline,
+                            size: 22, color: scheme.onSurface),
+                        onTap: () => FocusScope.of(context).unfocus(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 26),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _isLogin ? 'Hesabın yok mu? ' : 'Zaten hesabın var mı? ',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _isLogin = !_isLogin);
+                          _passwordController.clear();
+                        },
+                        child: Text(
+                          _isLogin ? 'Kayıt Ol' : 'Giriş Yap',
+                          style: TextStyle(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
             ),
           ),
         ),
       ),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: DropdownButton<String>(
-              value: _language,
-              underline: const SizedBox(),
-              icon: const Icon(Icons.language),
-              onChanged: (value) {
-                setState(() => _language = value!);
-              },
-              items: const [
-                DropdownMenuItem(value: 'tr', child: Text('🇹🇷 TR')),
-                DropdownMenuItem(value: 'en', child: Text('🇺🇸 EN')),
-              ],
-            ),
+    );
+  }
+
+  Widget _headline(ColorScheme scheme) {
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: 25,
+          fontWeight: FontWeight.w800,
+          height: 1.25,
+          color: scheme.onSurface,
+        ),
+        children: [
+          const TextSpan(text: 'Alışverişini kolaylaştır,\n'),
+          TextSpan(
+            text: 'zaman kazan!',
+            style: TextStyle(color: scheme.primary),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _orDivider(ColorScheme scheme) {
+    final line = Expanded(
+      child: Divider(color: scheme.outlineVariant, thickness: 1),
+    );
+    return Row(
+      children: [
+        line,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text('veya',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
+        ),
+        line,
+      ],
+    );
+  }
+}
+
+/// Giriş ekranının üstündeki dekoratif "alışveriş" görseli.
+/// (Harici görsel dosyası yok; sade bir kompozisyonla yaklaşıyoruz.)
+class _LoginArtwork extends StatelessWidget {
+  const _LoginArtwork();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 150,
+      height: 150,
+      decoration: const BoxDecoration(
+        color: AppTheme.heroGreenBg,
+        shape: BoxShape.circle,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(Icons.shopping_basket_rounded, size: 76, color: scheme.primary),
+          Positioned(
+            top: 30,
+            right: 34,
+            child: _dot(const Color(0xFFEF5350), 14),
+          ),
+          Positioned(
+            top: 40,
+            left: 32,
+            child: _dot(const Color(0xFFFFB300), 11),
+          ),
+          Positioned(
+            bottom: 34,
+            left: 40,
+            child: _dot(const Color(0xFF66BB6A), 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dot(Color color, double size) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+}
+
+/// Dairesel, kenarlıklı sosyal giriş butonu.
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.child,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Widget child;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Center(child: child),
+        ),
       ),
     );
   }
