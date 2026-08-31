@@ -7,6 +7,7 @@ import 'dart:async'; // StreamSubscription için eklendi
 // Diğer ekran importları (örneğin CreateListPage)
 // import 'create_list.dart'; // create_list.dart olarak doğru dosya adı - KULLANILMADIĞI İÇİN KALDIRILDI
 import 'category_detail_page.dart'; // Yeni: Kategori detay sayfası importu
+import '../constants/categories.dart';
 
 // WeeklyData modeli, doğrudan HomePage'deki grafik tarafından kullanıldığı için burada kalır.
 class WeeklyData {
@@ -212,95 +213,33 @@ class _HomePageState extends State<HomePage> {
     FocusScope.of(context).unfocus();
   }
 
-  // Yeni: Dinamik kategorileri Supabase'den çek ve kullanıcı tercihlerini dahil et
+  // Dinamik kategorileri Supabase'den çek ve kullanıcı tercihlerini dahil et
   Future<void> fetchDynamicCategories() async {
     try {
-      // globalPrimarySwatch'i widget'tan al
-      final MaterialColor globalPrimarySwatch = widget.customPrimarySwatch;
-      final Color globalPrimaryColor = globalPrimarySwatch; // Ana renk, MaterialColor'ın kendisidir (500 tonu)
-
-      // Tüm mevcut kategorileri tanımla - Bu, kullanıcının seçebileceği master listesidir.
-      List<Map<String, dynamic>> defaultDefinedCategories = [
-        {
-          'name': 'Market',
-          'icon': Icons.local_grocery_store,
-          'colors': [const Color(0xFF56AB2F), const Color(0xFFA8E063)], // Yeşil tonları
-        },
-        {
-          'name': 'Kıyafet',
-          'icon': Icons.style,
-          'colors': [const Color(0xFFF7971E), const Color(0xFFFF5F6D)], // Turuncu-kırmızı tonları
-        },
-        {
-          'name': 'Elektronik',
-          'icon': Icons.power,
-          // globalPrimarySwatch kullanıldı
-          'colors': [globalPrimarySwatch.shade300, globalPrimaryColor],
-        },
-        {
-          'name': 'Temizlik',
-          'icon': Icons.cleaning_services,
-          'colors': [const Color(0xFF4CB8C4), const Color(0xFF3CD3AD)], // Mavi-turkuaz tonları
-        },
-        {
-          'name': 'Kırtasiye',
-          'icon': Icons.school,
-          'colors': [const Color(0xFFFFCC33), const Color(0xFFE2B00E)], // Sarı tonları
-        },
-        {
-          'name': 'Evcil Hayvan',
-          'icon': Icons.pets,
-          'colors': [const Color(0xFF536976), const Color(0xFF292E49)], // Gri-mavi tonları
-        },
-        { // Örnek olarak eklenen popüler kategori
-          'name': 'Gıda',
-          'icon': Icons.restaurant_menu,
-          'colors': [const Color(0xFFA8E063), const Color(0xFF56AB2F)],
-        },
-        { // Örnek olarak eklenen popüler kategori
-          'name': 'Bebek',
-          'icon': Icons.child_care,
-          // globalPrimarySwatch kullanıldı
-          'colors': [globalPrimarySwatch.shade50, globalPrimarySwatch.shade200],
-        },
-      ];
-
-      // Fetch all list items to count products per category
+      // Ürünleri çek: kategori başına adet + tamamlanan adet sayımı için
       final allListItemsResponse = await supabase
           .from('list_items')
-          .select('category, is_completed'); // Fetch completed status too
+          .select('category, is_completed');
 
       final Map<String, int> categoryCounts = {};
-      final Map<String, int> completedCategoryCounts = {}; // New: count completed items per category
-      Set<String> uniqueListItemCategories = {}; // list_items'tan gelen benzersiz kategoriler
+      final Map<String, int> completedCategoryCounts = {};
+      final Set<String> uniqueListItemCategories = {};
 
       for (var item in allListItemsResponse) {
         final categoryName = item['category'] as String?;
         if (categoryName != null && categoryName.isNotEmpty) {
           categoryCounts[categoryName] = (categoryCounts[categoryName] ?? 0) + 1;
           uniqueListItemCategories.add(categoryName);
-          if (item['is_completed'] == true) { // If item is completed
-            completedCategoryCounts[categoryName] = (completedCategoryCounts[categoryName] ?? 0) + 1;
+          if (item['is_completed'] == true) {
+            completedCategoryCounts[categoryName] =
+                (completedCategoryCounts[categoryName] ?? 0) + 1;
           }
         }
       }
 
-      // _allAvailableCategories listesini oluştur:
-      // Önce varsayılanları ekle
-      List<Map<String, dynamic>> tempAllAvailableCategories = [];
-      tempAllAvailableCategories.addAll(defaultDefinedCategories);
-
-      // Sonra list_items'tan gelen benzersiz kategorileri (varsayılanlarda olmayanları) ekle
-      for (String categoryName in uniqueListItemCategories) {
-        if (!tempAllAvailableCategories.any((cat) => cat['name'].toLowerCase() == categoryName.toLowerCase())) {
-          tempAllAvailableCategories.add({
-            'name': categoryName,
-            'icon': Icons.category_outlined, // Yeni eklenenlere varsayılan ikon
-            'colors': [Colors.blueGrey.shade300, Colors.blueGrey.shade500], // Varsayılan renkler
-          });
-        }
-      }
-      // _allAvailableCategories state'ini güncelle
+      // Varsayılan kategoriler + list_items'ta geçen ekstra kategoriler
+      final tempAllAvailableCategories =
+          mergeDiscoveredCategories(uniqueListItemCategories);
       setState(() {
         _allAvailableCategories = tempAllAvailableCategories;
       });

@@ -7,6 +7,7 @@ import 'list_detail.dart';
 import 'create_list.dart';
 import 'ai_chat.dart';
 import 'stats.dart'; // İstatistikler sayfası için import
+import '../constants/categories.dart';
 
 class MyListsPage extends StatefulWidget {
   final MaterialColor customPrimarySwatch;
@@ -72,84 +73,21 @@ class _MyListsPageState extends State<MyListsPage> {
 
   Future<void> _fetchAllAvailableCategories() async {
     try {
-      List<Map<String, dynamic>> defaultDefinedCategories = [
-        {
-          'name': 'Market',
-          'icon': Icons.local_grocery_store,
-          'colors': [const Color(0xFF56AB2F), const Color(0xFFA8E063)],
-        },
-        {
-          'name': 'Kıyafet',
-          'icon': Icons.style,
-          'colors': [const Color(0xFFF7971E), const Color(0xFFFF5F6D)],
-        },
-        {
-          'name': 'Elektronik',
-          'icon': Icons.power,
-          'colors': [const Color(0xFFAA076B), const Color(0xFF61045F)],
-        },
-        {
-          'name': 'Temizlik',
-          'icon': Icons.cleaning_services,
-          'colors': [const Color(0xFF4CB8C4), const Color(0xFF3CD3AD)],
-        },
-        {
-          'name': 'Kırtasiye',
-          'icon': Icons.school,
-          'colors': [const Color(0xFFFFCC33), const Color(0xFFE2B00E)],
-        },
-        {
-          'name': 'Evcil Hayvan',
-          'icon': Icons.pets,
-          'colors': [const Color(0xFF536976), const Color(0xFF292E49)],
-        },
-        {
-          'name': 'Gıda',
-          'icon': Icons.restaurant_menu,
-          'colors': [const Color(0xFFA8E063), const Color(0xFF56AB2F)],
-        },
-        {
-          'name': 'Bebek',
-          'icon': Icons.child_care,
-          'colors': [const Color(0xFFF7971E), const Color(0xFFFF5F6D)],
-        },
-      ];
-
-      final response = await supabase
-          .from('list_items')
-          .select('category');
-
-      Set<String> uniqueListItemCategories = {};
-      for (var item in response) {
-        final categoryName = item['category'] as String?;
-        if (categoryName != null && categoryName.isNotEmpty) {
-          uniqueListItemCategories.add(categoryName);
-        }
-      }
-
-      List<Map<String, dynamic>> tempAllAvailableCategories = [];
-      tempAllAvailableCategories.addAll(defaultDefinedCategories);
-
-      for (String categoryName in uniqueListItemCategories) {
-        if (!tempAllAvailableCategories.any((cat) => cat['name'].toLowerCase() == categoryName.toLowerCase())) {
-          tempAllAvailableCategories.add({
-            'name': categoryName,
-            'icon': Icons.category_outlined,
-            'colors': [Colors.blueGrey.shade300, Colors.blueGrey.shade500],
-          });
-        }
-      }
+      final response = await supabase.from('list_items').select('category');
+      final discovered = response
+          .map((item) => item['category'] as String?)
+          .whereType<String>();
 
       if (mounted) {
         setState(() {
-          _allAvailableCategories = tempAllAvailableCategories;
+          _allAvailableCategories = mergeDiscoveredCategories(discovered);
         });
       }
     } catch (e) {
       debugPrint('Tüm mevcut kategoriler çekilemedi: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kategoriler yüklenirken hata oluştu: $e')),
+          const SnackBar(content: Text('Kategoriler yüklenirken bir hata oluştu.')),
         );
       }
     }
