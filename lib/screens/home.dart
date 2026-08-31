@@ -7,6 +7,7 @@ import 'dart:async'; // StreamSubscription için eklendi
 // Diğer ekran importları (örneğin CreateListPage)
 // import 'create_list.dart'; // create_list.dart olarak doğru dosya adı - KULLANILMADIĞI İÇİN KALDIRILDI
 import 'category_detail_page.dart'; // Yeni: Kategori detay sayfası importu
+import '../constants/categories.dart';
 
 // WeeklyData modeli, doğrudan HomePage'deki grafik tarafından kullanıldığı için burada kalır.
 class WeeklyData {
@@ -43,7 +44,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
   List<String> _currentSuggestions = []; // Arama önerileri için yeni liste
   bool _showSuggestions = false; // Önerileri göster/gizle durumu
-  FocusNode _searchFocusNode = FocusNode(); // Arama çubuğu odak takibi için
+  final FocusNode _searchFocusNode = FocusNode(); // Arama çubuğu odak takibi için
 
   // Realtime Subscriptions
   StreamSubscription<List<Map<String, dynamic>>>? _shoppingListSubscription;
@@ -212,95 +213,33 @@ class _HomePageState extends State<HomePage> {
     FocusScope.of(context).unfocus();
   }
 
-  // Yeni: Dinamik kategorileri Supabase'den çek ve kullanıcı tercihlerini dahil et
+  // Dinamik kategorileri Supabase'den çek ve kullanıcı tercihlerini dahil et
   Future<void> fetchDynamicCategories() async {
     try {
-      // globalPrimarySwatch'i widget'tan al
-      final MaterialColor globalPrimarySwatch = widget.customPrimarySwatch;
-      final Color globalPrimaryColor = globalPrimarySwatch; // Ana renk, MaterialColor'ın kendisidir (500 tonu)
-
-      // Tüm mevcut kategorileri tanımla - Bu, kullanıcının seçebileceği master listesidir.
-      List<Map<String, dynamic>> defaultDefinedCategories = [
-        {
-          'name': 'Market',
-          'icon': Icons.local_grocery_store,
-          'colors': [const Color(0xFF56AB2F), const Color(0xFFA8E063)], // Yeşil tonları
-        },
-        {
-          'name': 'Kıyafet',
-          'icon': Icons.style,
-          'colors': [const Color(0xFFF7971E), const Color(0xFFFF5F6D)], // Turuncu-kırmızı tonları
-        },
-        {
-          'name': 'Elektronik',
-          'icon': Icons.power,
-          // globalPrimarySwatch kullanıldı
-          'colors': [globalPrimarySwatch.shade300, globalPrimaryColor],
-        },
-        {
-          'name': 'Temizlik',
-          'icon': Icons.cleaning_services,
-          'colors': [const Color(0xFF4CB8C4), const Color(0xFF3CD3AD)], // Mavi-turkuaz tonları
-        },
-        {
-          'name': 'Kırtasiye',
-          'icon': Icons.school,
-          'colors': [const Color(0xFFFFCC33), const Color(0xFFE2B00E)], // Sarı tonları
-        },
-        {
-          'name': 'Evcil Hayvan',
-          'icon': Icons.pets,
-          'colors': [const Color(0xFF536976), const Color(0xFF292E49)], // Gri-mavi tonları
-        },
-        { // Örnek olarak eklenen popüler kategori
-          'name': 'Gıda',
-          'icon': Icons.restaurant_menu,
-          'colors': [const Color(0xFFA8E063), const Color(0xFF56AB2F)],
-        },
-        { // Örnek olarak eklenen popüler kategori
-          'name': 'Bebek',
-          'icon': Icons.child_care,
-          // globalPrimarySwatch kullanıldı
-          'colors': [globalPrimarySwatch.shade50, globalPrimarySwatch.shade200],
-        },
-      ];
-
-      // Fetch all list items to count products per category
+      // Ürünleri çek: kategori başına adet + tamamlanan adet sayımı için
       final allListItemsResponse = await supabase
           .from('list_items')
-          .select('category, is_completed'); // Fetch completed status too
+          .select('category, is_completed');
 
       final Map<String, int> categoryCounts = {};
-      final Map<String, int> completedCategoryCounts = {}; // New: count completed items per category
-      Set<String> uniqueListItemCategories = {}; // list_items'tan gelen benzersiz kategoriler
+      final Map<String, int> completedCategoryCounts = {};
+      final Set<String> uniqueListItemCategories = {};
 
       for (var item in allListItemsResponse) {
         final categoryName = item['category'] as String?;
         if (categoryName != null && categoryName.isNotEmpty) {
           categoryCounts[categoryName] = (categoryCounts[categoryName] ?? 0) + 1;
           uniqueListItemCategories.add(categoryName);
-          if (item['is_completed'] == true) { // If item is completed
-            completedCategoryCounts[categoryName] = (completedCategoryCounts[categoryName] ?? 0) + 1;
+          if (item['is_completed'] == true) {
+            completedCategoryCounts[categoryName] =
+                (completedCategoryCounts[categoryName] ?? 0) + 1;
           }
         }
       }
 
-      // _allAvailableCategories listesini oluştur:
-      // Önce varsayılanları ekle
-      List<Map<String, dynamic>> tempAllAvailableCategories = [];
-      tempAllAvailableCategories.addAll(defaultDefinedCategories);
-
-      // Sonra list_items'tan gelen benzersiz kategorileri (varsayılanlarda olmayanları) ekle
-      for (String categoryName in uniqueListItemCategories) {
-        if (!tempAllAvailableCategories.any((cat) => cat['name'].toLowerCase() == categoryName.toLowerCase())) {
-          tempAllAvailableCategories.add({
-            'name': categoryName,
-            'icon': Icons.category_outlined, // Yeni eklenenlere varsayılan ikon
-            'colors': [Colors.blueGrey.shade300, Colors.blueGrey.shade500], // Varsayılan renkler
-          });
-        }
-      }
-      // _allAvailableCategories state'ini güncelle
+      // Varsayılan kategoriler + list_items'ta geçen ekstra kategoriler
+      final tempAllAvailableCategories =
+          mergeDiscoveredCategories(uniqueListItemCategories);
       setState(() {
         _allAvailableCategories = tempAllAvailableCategories;
       });
@@ -387,7 +326,7 @@ class _HomePageState extends State<HomePage> {
 
     // Modalı açtığımızda kullanıcının mevcut tercihlerini kopyala
     // Bu liste, modal içindeki geçici durumu tutacak.
-    List<String> _selectedCategoriesInModal = _dynamicCategories.map((e) => e['name'] as String).toList();
+    List<String> selectedCategoriesInModal = _dynamicCategories.map((e) => e['name'] as String).toList();
 
     showModalBottomSheet(
       context: context,
@@ -440,7 +379,7 @@ class _HomePageState extends State<HomePage> {
                       itemBuilder: (context, index) {
                         final category = _allAvailableCategories[index];
                         // Modaldaki geçici listeyi kontrol et
-                        final isSelected = _selectedCategoriesInModal.contains(category['name']);
+                        final isSelected = selectedCategoriesInModal.contains(category['name']);
                         
                         // Kategori kartlarının renklerini belirlerken ana tema rengine göre ayarlıyoruz
                         List<Color> categoryModalColors;
@@ -461,15 +400,15 @@ class _HomePageState extends State<HomePage> {
                           onChanged: (bool? newValue) {
                             modalSetState(() { // Modalı güncelle
                               if (newValue == true) {
-                                if (_selectedCategoriesInModal.length < 6) { // Max 6 kategori seçilebilir
-                                  _selectedCategoriesInModal.add(category['name'] as String);
+                                if (selectedCategoriesInModal.length < 6) { // Max 6 kategori seçilebilir
+                                  selectedCategoriesInModal.add(category['name'] as String);
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('En fazla 6 kategori seçebilirsiniz.')),
                                   );
                                 }
                               } else {
-                                _selectedCategoriesInModal.remove(category['name'] as String);
+                                selectedCategoriesInModal.remove(category['name'] as String);
                               }
                             });
                           },
@@ -486,7 +425,7 @@ class _HomePageState extends State<HomePage> {
                         try {
                           await supabase
                               .from('users')
-                              .update({'preferred_categories': _selectedCategoriesInModal})
+                              .update({'preferred_categories': selectedCategoriesInModal})
                               .eq('id', userId);
                           
                           if (mounted) {
@@ -555,7 +494,7 @@ class _HomePageState extends State<HomePage> {
       Shadow(
         offset: const Offset(1.0, 1.0),
         blurRadius: 3.0,
-        color: Colors.black.withOpacity(0.4),
+        color: Colors.black.withValues(alpha: 0.4),
       ),
     ];
   }
@@ -702,7 +641,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
+            color: Colors.grey.withValues(alpha: 0.15),
             spreadRadius: 2,
             blurRadius: elevation,
             offset: const Offset(0, 4),
@@ -761,7 +700,7 @@ class _HomePageState extends State<HomePage> {
           ),
           boxShadow: [
             BoxShadow(
-              color: gradientColors[0].withOpacity(0.3),
+              color: gradientColors[0].withValues(alpha: 0.3),
               spreadRadius: 1,
               blurRadius: 5,
               offset: const Offset(0, 3),
@@ -789,7 +728,7 @@ class _HomePageState extends State<HomePage> {
               Text(
                 '$itemCount Ürün',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 11,
                 ),
               ),
@@ -797,7 +736,7 @@ class _HomePageState extends State<HomePage> {
                 width: double.infinity,
                 child: LinearProgressIndicator(
                   value: completionRate,
-                  backgroundColor: Colors.white.withOpacity(0.3),
+                  backgroundColor: Colors.white.withValues(alpha: 0.3),
                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                   minHeight: 4,
                 ),
@@ -805,7 +744,7 @@ class _HomePageState extends State<HomePage> {
               Text(
                 '${(completionRate * 100).round()}% Tamamlandı',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 10,
                 ),
               ),
@@ -828,7 +767,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 4,
             offset: const Offset(0, 2),
@@ -864,14 +803,14 @@ class _HomePageState extends State<HomePage> {
           InkWell(
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('"${productName}" listenize eklendi!')),
+                SnackBar(content: Text('"$productName" listenize eklendi!')),
               );
             },
             borderRadius: BorderRadius.circular(8),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: globalPrimaryColor.withOpacity(0.1), // Temanın ana rengini kullanır
+                color: globalPrimaryColor.withValues(alpha: 0.1), // Temanın ana rengini kullanır
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -894,7 +833,7 @@ class _HomePageState extends State<HomePage> {
             width: 45,
             height: 45,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.15),
+              color: accentColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(Icons.shopping_bag_outlined, color: accentColor, size: 26),
@@ -915,7 +854,7 @@ class _HomePageState extends State<HomePage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${count} kez alındı',
+                  '$count kez alındı',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 13,
@@ -937,7 +876,7 @@ class _HomePageState extends State<HomePage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, size: 30, color: color),
@@ -992,7 +931,7 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 4,
               offset: const Offset(0, 2),
@@ -1076,7 +1015,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withValues(alpha: 0.08),
                             spreadRadius: 0,
                             blurRadius: 15,
                             offset: const Offset(0, 8),
@@ -1094,7 +1033,7 @@ class _HomePageState extends State<HomePage> {
                                 icon: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
@@ -1116,7 +1055,7 @@ class _HomePageState extends State<HomePage> {
                                   const SizedBox(width: 8),
                                   CircleAvatar(
                                     radius: 20,
-                                    backgroundColor: Colors.white.withOpacity(0.3),
+                                    backgroundColor: Colors.white.withValues(alpha: 0.3),
                                     child: const Icon(Icons.person, color: Colors.white, size: 24),
                                   ),
                                 ],
@@ -1146,7 +1085,7 @@ class _HomePageState extends State<HomePage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withValues(alpha: 0.4),
                               borderRadius: BorderRadius.circular(25),
                             ),
                             child: TextField(
@@ -1155,7 +1094,7 @@ class _HomePageState extends State<HomePage> {
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
                                 hintText: 'Ne arıyorsunuz?',
-                                hintStyle: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
+                                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 16),
                                 border: InputBorder.none,
                                 icon: IconButton(
                                   icon: const Icon(Icons.camera_alt, color: Colors.white, size: 24),

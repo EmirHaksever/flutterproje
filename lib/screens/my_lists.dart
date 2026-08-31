@@ -5,8 +5,7 @@ import 'dart:async'; // StreamSubscription için
 
 import 'list_detail.dart';
 import 'create_list.dart';
-import 'ai_chat.dart';
-import 'stats.dart'; // İstatistikler sayfası için import
+import '../constants/categories.dart';
 
 class MyListsPage extends StatefulWidget {
   final MaterialColor customPrimarySwatch;
@@ -22,7 +21,6 @@ class _MyListsPageState extends State<MyListsPage> {
   List<Map<String, dynamic>> _lists = [];
   bool _isLoadingLists = true;
   bool _isDeleting = false;
-  int _currentIndex = 1; // Bu sayfa ortada
   String? _userId;
 
   List<Map<String, dynamic>> _allAvailableCategories = [];
@@ -72,84 +70,21 @@ class _MyListsPageState extends State<MyListsPage> {
 
   Future<void> _fetchAllAvailableCategories() async {
     try {
-      List<Map<String, dynamic>> defaultDefinedCategories = [
-        {
-          'name': 'Market',
-          'icon': Icons.local_grocery_store,
-          'colors': [const Color(0xFF56AB2F), const Color(0xFFA8E063)],
-        },
-        {
-          'name': 'Kıyafet',
-          'icon': Icons.style,
-          'colors': [const Color(0xFFF7971E), const Color(0xFFFF5F6D)],
-        },
-        {
-          'name': 'Elektronik',
-          'icon': Icons.power,
-          'colors': [const Color(0xFFAA076B), const Color(0xFF61045F)],
-        },
-        {
-          'name': 'Temizlik',
-          'icon': Icons.cleaning_services,
-          'colors': [const Color(0xFF4CB8C4), const Color(0xFF3CD3AD)],
-        },
-        {
-          'name': 'Kırtasiye',
-          'icon': Icons.school,
-          'colors': [const Color(0xFFFFCC33), const Color(0xFFE2B00E)],
-        },
-        {
-          'name': 'Evcil Hayvan',
-          'icon': Icons.pets,
-          'colors': [const Color(0xFF536976), const Color(0xFF292E49)],
-        },
-        {
-          'name': 'Gıda',
-          'icon': Icons.restaurant_menu,
-          'colors': [const Color(0xFFA8E063), const Color(0xFF56AB2F)],
-        },
-        {
-          'name': 'Bebek',
-          'icon': Icons.child_care,
-          'colors': [const Color(0xFFF7971E), const Color(0xFFFF5F6D)],
-        },
-      ];
-
-      final response = await supabase
-          .from('list_items')
-          .select('category');
-
-      Set<String> uniqueListItemCategories = {};
-      for (var item in response) {
-        final categoryName = item['category'] as String?;
-        if (categoryName != null && categoryName.isNotEmpty) {
-          uniqueListItemCategories.add(categoryName);
-        }
-      }
-
-      List<Map<String, dynamic>> tempAllAvailableCategories = [];
-      tempAllAvailableCategories.addAll(defaultDefinedCategories);
-
-      for (String categoryName in uniqueListItemCategories) {
-        if (!tempAllAvailableCategories.any((cat) => cat['name'].toLowerCase() == categoryName.toLowerCase())) {
-          tempAllAvailableCategories.add({
-            'name': categoryName,
-            'icon': Icons.category_outlined,
-            'colors': [Colors.blueGrey.shade300, Colors.blueGrey.shade500],
-          });
-        }
-      }
+      final response = await supabase.from('list_items').select('category');
+      final discovered = response
+          .map((item) => item['category'] as String?)
+          .whereType<String>();
 
       if (mounted) {
         setState(() {
-          _allAvailableCategories = tempAllAvailableCategories;
+          _allAvailableCategories = mergeDiscoveredCategories(discovered);
         });
       }
     } catch (e) {
       debugPrint('Tüm mevcut kategoriler çekilemedi: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kategoriler yüklenirken hata oluştu: $e')),
+          const SnackBar(content: Text('Kategoriler yüklenirken bir hata oluştu.')),
         );
       }
     }
@@ -261,7 +196,7 @@ class _MyListsPageState extends State<MyListsPage> {
                 final index = _lists.indexWhere((list) => list['id'] == updatedListId);
                 if (index != -1) {
                   _lists[index]['completion_rate'] = newCompletionRate;
-                  debugPrint('List "${updatedListName}" completion rate updated in UI to: $newCompletionRate');
+                  debugPrint('List "$updatedListName" completion rate updated in UI to: $newCompletionRate');
                 } else {
                   debugPrint('Updated list not found in current view. Re-fetching all lists.');
                   _fetchLists();
@@ -483,34 +418,16 @@ class _MyListsPageState extends State<MyListsPage> {
     }
   }
 
-  void _onTabTapped(int index) {
-    if (index == _currentIndex) return;
-
-    setState(() => _currentIndex = index);
-
-    final MaterialColor safePrimarySwatch = widget.customPrimarySwatch;
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CreateListPage(
-            availableCategories: _allAvailableCategories,
-            customPrimarySwatch: safePrimarySwatch,
-          ),
+  void _openCreateList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateListPage(
+          availableCategories: _allAvailableCategories,
+          customPrimarySwatch: widget.customPrimarySwatch,
         ),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AIChatPage()),
-      );
-    } else if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => StatsPage(customPrimarySwatch: safePrimarySwatch)),
-      );
-    }
+      ),
+    );
   }
 
   // Helper function to get a consistent color for each list based on its ID
@@ -561,9 +478,7 @@ class _MyListsPageState extends State<MyListsPage> {
                               ),
                               const SizedBox(height: 30),
                               ElevatedButton.icon(
-                                onPressed: () {
-                                  _onTabTapped(0);
-                                },
+                                onPressed: _openCreateList,
                                 icon: const Icon(Icons.add_circle_outline),
                                 label: const Text('Yeni Liste Oluştur'),
                                 style: ElevatedButton.styleFrom(
@@ -654,7 +569,7 @@ class _MyListsPageState extends State<MyListsPage> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      '${itemCount} Ürün',
+                                      '$itemCount Ürün',
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: Colors.grey.shade700,
@@ -717,55 +632,12 @@ class _MyListsPageState extends State<MyListsPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _onTabTapped(0),
+        onPressed: _openCreateList,
         icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
         label: const Text('Yeni Liste Oluştur', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: globalPrimaryColor.shade700,
         elevation: 8,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
-        color: Colors.white,
-        elevation: 10,
-        child: Row(
-        ),
-      ),
-    );
-  }
-
-  // Alt gezinme çubuğu öğesi için yardımcı widget
-  Widget _buildNavItem(IconData icon, String label, int index, MaterialColor primaryColor) {
-    final bool isSelected = _currentIndex == index;
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _onTabTapped(index),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  color: isSelected ? primaryColor.shade700 : Colors.grey.shade600,
-                  size: 26,
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? primaryColor.shade700 : Colors.grey.shade600,
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

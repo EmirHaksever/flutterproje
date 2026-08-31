@@ -287,11 +287,11 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xFF6A1B9A).withOpacity(0.9) : const Color(0xFFE8EAF6), // Mor tonları / Açık gri-mavi
+          color: isUser ? const Color(0xFF6A1B9A).withValues(alpha: 0.9) : const Color(0xFFE8EAF6), // Mor tonları / Açık gri-mavi
           borderRadius: BorderRadius.circular(20), // Daha yuvarlak baloncuklar
           boxShadow: [
             BoxShadow(
-              color: (isUser ? const Color(0xFF6A1B9A) : Colors.grey).withOpacity(0.2),
+              color: (isUser ? const Color(0xFF6A1B9A) : Colors.grey).withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -324,11 +324,11 @@ class _AIChatPageState extends State<AIChatPage> with SingleTickerProviderStateM
                 label: Text(entry.key),
                 onPressed: isLoading ? null : () => handlePrompt(entry.value['value'] as String),
                 backgroundColor: Colors.white,
-                side: BorderSide(color: const Color(0xFF6A1B9A).withOpacity(0.4), width: 1.0), // Mor kenarlık
+                side: BorderSide(color: const Color(0xFF6A1B9A).withValues(alpha: 0.4), width: 1.0), // Mor kenarlık
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 labelStyle: const TextStyle(color: Color(0xFF6A1B9A), fontWeight: FontWeight.w600, fontSize: 14),
                 elevation: 4,
-                shadowColor: Colors.black.withOpacity(0.15),
+                shadowColor: Colors.black.withValues(alpha: 0.15),
               ),
             );
           }).toList(),

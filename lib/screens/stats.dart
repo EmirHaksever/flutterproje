@@ -59,7 +59,7 @@ class _StatsPageState extends State<StatsPage> {
           .select('id, created_at')
           .eq('user_id', userId)
           .count(CountOption.exact);
-      _totalLists = listsResponse.count ?? 0;
+      _totalLists = listsResponse.count;
 
       // 2. Tüm ürünleri çek (tamamlanan ve tamamlanmayan)
       final itemsResponse = await supabase
@@ -293,7 +293,7 @@ class _StatsPageState extends State<StatsPage> {
             BarChartData(
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
-                  getTooltipColor: (group) => widget.customPrimarySwatch.shade700.withOpacity(0.9),
+                  getTooltipColor: (group) => widget.customPrimarySwatch.shade700.withValues(alpha: 0.9),
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     return BarTooltipItem(
                       '${monthLabels[groupIndex]} ${rod.toY.toInt()} Ürün',
@@ -415,7 +415,7 @@ class _StatsPageState extends State<StatsPage> {
         PieChartSectionData(
           color: pieColors[i % pieColors.length],
           value: value,
-          title: '${category['name']}\n%${percentage}',
+          title: '${category['name']}\n%$percentage',
           radius: 80, // Dilim yarıçapı
           titleStyle: const TextStyle(
             fontSize: 12,
@@ -470,11 +470,11 @@ class _StatsPageState extends State<StatsPage> {
     }
 
     double maxY = 0;
-    _productActivityData.values.forEach((list) {
-      list.forEach((spot) {
+    for (var list in _productActivityData.values) {
+      for (var spot in list) {
         if (spot.y > maxY) maxY = spot.y;
-      });
-    });
+      }
+    }
     maxY = maxY * 1.2; // Biraz boşluk bırak
 
     List<LineChartBarData> lines = [];
@@ -498,7 +498,7 @@ class _StatsPageState extends State<StatsPage> {
           dotData: const FlDotData(show: false), // Noktaları gizle
           belowBarData: BarAreaData(
             show: true,
-            color: lineColors[colorIndex % lineColors.length].withOpacity(0.3),
+            color: lineColors[colorIndex % lineColors.length].withValues(alpha: 0.3),
           ),
         ),
       );

@@ -270,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: InputDecoration(
                           labelText: isTurkish ? 'E-posta' : 'Email',
                           hintText: 'ornek@email.com',
-                          prefixIcon: Icon(Icons.email_outlined, color: _loginAccentColor.withOpacity(0.7)), // Vurgu rengi kullanıldı
+                          prefixIcon: Icon(Icons.email_outlined, color: _loginAccentColor.withValues(alpha: 0.7)), // Vurgu rengi kullanıldı
                           filled: true,
                           fillColor: Colors.grey.shade100,
                           border: OutlineInputBorder(
@@ -292,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: InputDecoration(
                           labelText: isTurkish ? 'Şifre' : 'Password',
                           hintText: '••••••••',
-                          prefixIcon: Icon(Icons.lock_outline, color: _loginAccentColor.withOpacity(0.7)), // Vurgu rengi kullanıldı
+                          prefixIcon: Icon(Icons.lock_outline, color: _loginAccentColor.withValues(alpha: 0.7)), // Vurgu rengi kullanıldı
                           filled: true,
                           fillColor: Colors.grey.shade100,
                           border: OutlineInputBorder(
@@ -377,7 +377,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           _rememberMe = false; // Form değiştiğinde "beni hatırla" seçeneğini sıfırla
                         },
                         style: TextButton.styleFrom(
-                          foregroundColor: _loginAccentColor.withOpacity(0.8), // Vurgu rengi kullanıldı
+                          foregroundColor: _loginAccentColor.withValues(alpha: 0.8), // Vurgu rengi kullanıldı
                           textStyle: const TextStyle(fontSize: 16),
                         ),
                         child: Text(
