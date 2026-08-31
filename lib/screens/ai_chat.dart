@@ -105,6 +105,8 @@ class _AIChatPageState extends State<AIChatPage>
                     'role': e['role'] as String,
                     'text': e['message'] as String,
                   })
+              // Eski oturumlardan kalma hata mesajlarını gizle.
+              .where((m) => !(m['role'] == 'ai' && _looksLikeError(m['text']!)))
               .toList();
           isLoading = false;
         });
@@ -113,6 +115,54 @@ class _AIChatPageState extends State<AIChatPage>
     } catch (e) {
       debugPrint('Sohbet geçmişi yüklenemedi: $e');
       if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  bool _looksLikeError(String t) {
+    final s = t.trimLeft();
+    return s.startsWith('Hata:') ||
+        s.startsWith('Exception:') ||
+        s.contains('Gemini API hatası') ||
+        s.contains('no longer available');
+  }
+
+  Future<void> _clearChat() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sohbeti Temizle'),
+        content: const Text(
+            'Tüm sohbet geçmişin silinsin mi? Bu işlem geri alınamaz.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Temizle'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || _currentUserId == null) return;
+    try {
+      await supabase
+          .from('ai_chat_history')
+          .delete()
+          .eq('user_id', _currentUserId!);
+      if (mounted) {
+        setState(() => messages = [
+              {
+                'role': 'ai',
+                'text': 'Merhaba! 👋 Bugün sana nasıl yardımcı olabilirim?'
+              }
+            ]);
+      }
+    } catch (e) {
+      debugPrint('Sohbet temizlenemedi: $e');
+      if (mounted) _showError(e);
     }
   }
 
@@ -289,6 +339,16 @@ class _AIChatPageState extends State<AIChatPage>
             ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'clear') _clearChat();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'clear', child: Text('Sohbeti Temizle')),
+            ],
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
