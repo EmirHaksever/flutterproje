@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/friend.dart';
 import '../repositories/friends_repository.dart';
+import '../theme/app_theme.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -13,6 +14,7 @@ class FriendsScreen extends StatefulWidget {
 
 class _FriendsScreenState extends State<FriendsScreen> {
   final FriendsRepository _repo = FriendsRepository();
+  final TextEditingController _addCtrl = TextEditingController();
 
   bool _loading = true;
   List<Friend> _friends = [];
@@ -23,6 +25,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _addCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -40,67 +48,51 @@ class _FriendsScreenState extends State<FriendsScreen> {
         _outgoing = results[2] as List<FriendRequest>;
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _snack('Arkadaş verileri yüklenemedi.');
+      _snack('Arkadaş verileri yüklenemedi.', error: true);
     }
   }
 
-  void _snack(String msg, {Color? color}) {
+  void _snack(String msg, {bool error = false, bool ok = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: color),
-    );
+    final scheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error
+          ? scheme.error
+          : ok
+              ? scheme.primary
+              : null,
+    ));
   }
 
-  Future<void> _addFriendDialog() async {
-    final controller = TextEditingController();
-    final email = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Arkadaş ekle'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'E-posta adresi',
-            hintText: 'arkadas@email.com',
-            prefixIcon: Icon(Icons.alternate_email),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('İstek gönder'),
-          ),
-        ],
-      ),
-    );
-    if (email == null || email.isEmpty) return;
-
+  Future<void> _sendRequest() async {
+    final email = _addCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      _snack('Geçerli bir e-posta gir.', error: true);
+      return;
+    }
     try {
       await _repo.sendRequest(email);
-      _snack('Arkadaşlık isteği gönderildi.', color: Colors.green);
+      if (!mounted) return;
+      _addCtrl.clear();
+      FocusScope.of(context).unfocus();
+      _snack('Arkadaşlık isteği gönderildi.', ok: true);
       _load();
     } catch (e) {
-      _snack(_cleanError(e), color: Colors.red.shade400);
+      _snack(_cleanError(e), error: true);
     }
   }
 
   Future<void> _respond(FriendRequest r, bool accept) async {
     try {
       await _repo.respond(r.id, accept: accept);
-      _snack(accept ? 'Arkadaş eklendi.' : 'İstek reddedildi.',
-          color: accept ? Colors.green : null);
+      _snack(accept ? 'Arkadaş eklendi.' : 'İstek reddedildi.', ok: accept);
       _load();
     } catch (e) {
-      _snack(_cleanError(e), color: Colors.red.shade400);
+      _snack(_cleanError(e), error: true);
     }
   }
 
@@ -108,8 +100,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
     try {
       await _repo.cancelRequest(r.id);
       _load();
-    } catch (e) {
-      _snack('İstek geri çekilemedi.', color: Colors.red.shade400);
+    } catch (_) {
+      _snack('İstek geri çekilemedi.', error: true);
     }
   }
 
@@ -123,8 +115,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('İptal')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Çıkar'),
           ),
@@ -135,174 +128,181 @@ class _FriendsScreenState extends State<FriendsScreen> {
     try {
       await _repo.removeFriend(f.friendEmail);
       _load();
-    } catch (e) {
-      _snack('İşlem başarısız.', color: Colors.red.shade400);
+    } catch (_) {
+      _snack('İşlem başarısız.', error: true);
     }
   }
 
   static String _cleanError(Object e) {
-    // RPC içindeki `raise exception` mesajı PostgrestException.message'a düşer.
     if (e is PostgrestException) return e.message;
-    return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+    return 'Bir hata oluştu. Lütfen tekrar dene.';
   }
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final scheme = Theme.of(context).colorScheme;
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Arkadaşlar'),
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
-          bottom: TabBar(
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(text: 'Arkadaşlar (${_friends.length})'),
-              Tab(text: 'Gelen (${_incoming.length})'),
-              Tab(text: 'Giden (${_outgoing.length})'),
-            ],
-          ),
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                children: [
-                  _FriendsTab(friends: _friends, onRemove: _remove),
-                  _RequestsTab(
-                    requests: _incoming,
-                    emptyText: 'Gelen istek yok.',
-                    trailingBuilder: (r) => Row(
-                      mainAxisSize: MainAxisSize.min,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(title: const Text('Arkadaşlar')),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: TextField(
+                controller: _addCtrl,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendRequest(),
+                decoration: InputDecoration(
+                  hintText: 'E-posta ile arkadaş ekle',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.add, color: scheme.primary),
+                    onPressed: _sendRequest,
+                  ),
+                ),
+              ),
+            ),
+            TabBar(
+              labelColor: scheme.primary,
+              unselectedLabelColor: scheme.onSurfaceVariant,
+              indicatorColor: scheme.primary,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+              tabs: [
+                Tab(text: 'Arkadaşlarım (${_friends.length})'),
+                Tab(text: 'Gelen (${_incoming.length})'),
+                Tab(text: 'Gönderilen (${_outgoing.length})'),
+              ],
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.check_circle,
-                              color: Colors.green),
-                          tooltip: 'Kabul et',
-                          onPressed: () => _respond(r, true),
-                        ),
-                        IconButton(
-                          icon:
-                              const Icon(Icons.cancel, color: Colors.redAccent),
-                          tooltip: 'Reddet',
-                          onPressed: () => _respond(r, false),
-                        ),
+                        _friendsTab(scheme),
+                        _requestsTab(scheme, _incoming, incoming: true),
+                        _requestsTab(scheme, _outgoing, incoming: false),
                       ],
                     ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _friendsTab(ColorScheme scheme) {
+    if (_friends.isEmpty) {
+      return _empty(scheme, Icons.group_outlined,
+          'Henüz arkadaşın yok.\nYukarıdan e-posta ile ekleyebilirsin.');
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _friends.length,
+        itemBuilder: (context, i) {
+          final f = _friends[i];
+          return _row(
+            scheme,
+            f.friendEmail,
+            trailing: PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
+              onSelected: (v) {
+                if (v == 'remove') _remove(f);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                    value: 'remove', child: Text('Arkadaşlıktan çıkar')),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _requestsTab(
+      ColorScheme scheme, List<FriendRequest> list, {required bool incoming}) {
+    if (list.isEmpty) {
+      return _empty(
+        scheme,
+        Icons.inbox_outlined,
+        incoming ? 'Gelen istek yok.' : 'Gönderilmiş istek yok.',
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: list.length,
+        itemBuilder: (context, i) {
+          final r = list[i];
+          final name = r.otherEmail.isEmpty ? 'Kullanıcı' : r.otherEmail;
+          return _row(
+            scheme,
+            name,
+            trailing: incoming
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () => _respond(r, true),
+                        child: const Text('Kabul Et'),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: scheme.onSurfaceVariant),
+                        onPressed: () => _respond(r, false),
+                      ),
+                    ],
+                  )
+                : TextButton(
+                    onPressed: () => _cancel(r),
+                    child: const Text('Geri çek'),
                   ),
-                  _RequestsTab(
-                    requests: _outgoing,
-                    emptyText: 'Gönderilmiş istek yok.',
-                    trailingBuilder: (r) => TextButton(
-                      onPressed: () => _cancel(r),
-                      child: const Text('Geri çek'),
-                    ),
-                  ),
-                ],
-              ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _addFriendDialog,
-          icon: const Icon(Icons.person_add),
-          label: const Text('Arkadaş ekle'),
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _row(ColorScheme scheme, String email, {required Widget trailing}) {
+    final letter =
+        email.isNotEmpty ? email[0].toUpperCase() : '?';
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+      leading: CircleAvatar(
+        backgroundColor: AppTheme.heroGreenBg,
+        child: Text(letter,
+            style: TextStyle(
+                fontWeight: FontWeight.w700, color: scheme.primary)),
+      ),
+      title: Text(email,
+          style: const TextStyle(
+              fontSize: 13.5, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis),
+      trailing: trailing,
+    );
+  }
+
+  Widget _empty(ColorScheme scheme, IconData icon, String text) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 54, color: scheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(text,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: scheme.onSurfaceVariant)),
+          ],
         ),
       ),
     );
   }
 }
-
-class _FriendsTab extends StatelessWidget {
-  const _FriendsTab({required this.friends, required this.onRemove});
-
-  final List<Friend> friends;
-  final void Function(Friend) onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    if (friends.isEmpty) {
-      return const _EmptyHint(
-          icon: Icons.group_outlined, text: 'Henüz arkadaşın yok.');
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: friends.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final f = friends[i];
-        return ListTile(
-          leading: CircleAvatar(child: Text(_initial(f.friendEmail))),
-          title: Text(f.friendEmail),
-          trailing: IconButton(
-            icon: const Icon(Icons.person_remove_outlined, color: Colors.grey),
-            tooltip: 'Çıkar',
-            onPressed: () => onRemove(f),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RequestsTab extends StatelessWidget {
-  const _RequestsTab({
-    required this.requests,
-    required this.emptyText,
-    required this.trailingBuilder,
-  });
-
-  final List<FriendRequest> requests;
-  final String emptyText;
-  final Widget Function(FriendRequest) trailingBuilder;
-
-  @override
-  Widget build(BuildContext context) {
-    if (requests.isEmpty) {
-      return _EmptyHint(icon: Icons.inbox_outlined, text: emptyText);
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: requests.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final r = requests[i];
-        return ListTile(
-          leading: CircleAvatar(child: Text(_initial(r.otherEmail))),
-          title: Text(r.otherEmail.isEmpty ? 'Kullanıcı' : r.otherEmail),
-          trailing: trailingBuilder(r),
-        );
-      },
-    );
-  }
-}
-
-class _EmptyHint extends StatelessWidget {
-  const _EmptyHint({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant),
-          const SizedBox(height: 12),
-          Text(text,
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 16)),
-        ],
-      ),
-    );
-  }
-}
-
-String _initial(String email) =>
-    email.isNotEmpty ? email[0].toUpperCase() : '?';
