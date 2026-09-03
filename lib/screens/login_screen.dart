@@ -71,8 +71,9 @@ class _LoginScreenState extends State<LoginScreen> {
           email: email,
           password: password,
         );
-        if (response.session != null && mounted) {
+        if (response.session != null) {
           await prefs.setString('email', email);
+          if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/home');
         }
       } else {
@@ -91,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     .update({'name': name}).eq('id', signUpResponse.user!.id);
               } catch (_) {}
             }
+            if (!mounted) return;
             if (signUpResponse.session == null) {
               _snack('Kayıt başarılı! E-postanı kontrol edip hesabını onayla, '
                   'sonra giriş yapabilirsin.');

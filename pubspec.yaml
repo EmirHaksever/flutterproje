@@ -55,5 +55,8 @@ flutter:
   assets:
     - .env
     - assets/icon/app_icon.png
+    # Poppins .ttf'leri buraya gömülü; google_fonts internet yerine bunları
+    # kullanır (offline + ilk açılışta yazı tipi sıçraması olmaz).
+    - assets/google_fonts/
 
     

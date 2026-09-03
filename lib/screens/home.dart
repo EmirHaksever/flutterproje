@@ -352,15 +352,14 @@ class _HomePageState extends State<HomePage> {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () async {
+                      final nav = Navigator.of(context);
                       try {
                         await supabase
                             .from('users')
                             .update({'preferred_categories': selected})
                             .eq('id', userId);
-                        if (mounted) {
-                          Navigator.pop(context);
-                          await fetchDynamicCategories();
-                        }
+                        nav.pop();
+                        if (mounted) await fetchDynamicCategories();
                       } catch (e) {
                         debugPrint('Kategori tercihleri kaydedilemedi: $e');
                       }
