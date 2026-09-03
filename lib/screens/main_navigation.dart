@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'friends_screen.dart';
 import 'notifications_screen.dart';
 import '../constants/categories.dart';
+import '../repositories/notifications_repository.dart';
 import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import 'home.dart';
@@ -40,8 +41,12 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   int _pageIndex = 0;
   String _userName = 'Misafir';
   String _userEmail = '';
+  String? _userAvatar;
+  int _unread = 0;
 
   final supabase = Supabase.instance.client;
+  final _notifRepo = NotificationsRepository();
+  RealtimeChannel? _notifChannel;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _allAvailableCategories = [];
   late final List<Widget> _pages;
@@ -63,6 +68,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     _fetchUserProfile();
     _fetchAllAvailableCategories();
     _initPush();
+    _fetchUnread();
+    _watchNotifications();
 
     supabase.auth.onAuthStateChange.listen((data) {
       if (!mounted) return;
@@ -110,7 +117,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     try {
       final response = await supabase
           .from('users')
-          .select('name')
+          .select('name, avatar_url')
           .eq('id', user.id)
           .maybeSingle();
       if (mounted) {
@@ -119,6 +126,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
               ? response!['name'] as String
               : 'Kullanıcı';
           _userEmail = user.email ?? '';
+          _userAvatar = response?['avatar_url'] as String?;
         });
       }
     } catch (e) {
@@ -131,6 +139,39 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       }
     }
   }
+
+  Future<void> _fetchUnread() async {
+    try {
+      final n = await _notifRepo.unreadCount();
+      if (mounted) setState(() => _unread = n);
+    } catch (_) {}
+  }
+
+  void _watchNotifications() {
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) return;
+    _notifChannel = supabase
+        .channel('public:main_nav_notifications')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: uid,
+          ),
+          callback: (_) => _fetchUnread(),
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _notifChannel?.unsubscribe();
+    super.dispose();
+  }
+
 
   void _openCreateList() {
     Navigator.push(
@@ -175,7 +216,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   void _openNotifications() {
     if (!mounted) return;
     Navigator.push(context,
-        MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()))
+        .then((_) => _fetchUnread());
   }
 
   /// Alt bar tıklama: 0,1 doğrudan sekme; 2 = "+" (Liste Oluştur); 3,4 sekme.
@@ -236,16 +278,34 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   }
 
   Widget _buildDrawer(ColorScheme scheme) {
-    Widget tile(IconData icon, String label, VoidCallback onTap,
-        {Color? color}) {
-      return ListTile(
-        leading: Icon(icon, color: color ?? scheme.onSurfaceVariant),
-        title: Text(label,
-            style: TextStyle(fontWeight: FontWeight.w500, color: color)),
-        onTap: () {
-          Navigator.pop(context);
-          onTap();
-        },
+    Widget tile(
+      IconData icon,
+      String label,
+      VoidCallback onTap, {
+      Color? color,
+      bool selected = false,
+      Widget? trailing,
+    }) {
+      final fg = color ?? (selected ? scheme.primary : scheme.onSurface);
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+        child: ListTile(
+          dense: true,
+          selected: selected,
+          selectedTileColor: AppTheme.heroGreenBg,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+          leading: Icon(icon, size: 22, color: fg),
+          title: Text(label,
+              style: TextStyle(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: fg)),
+          trailing: trailing,
+          onTap: () {
+            Navigator.pop(context);
+            onTap();
+          },
+        ),
       );
     }
 
@@ -253,40 +313,100 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     void push(Widget page) =>
         Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
+    final hasAvatar = _userAvatar != null && _userAvatar!.isNotEmpty;
+
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          UserAccountsDrawerHeader(
-            decoration: BoxDecoration(color: scheme.primary),
-            accountName: Text(_userName,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            accountEmail: Text(_userEmail),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: AppTheme.heroGreenBg,
-              child: Icon(Icons.person, color: scheme.primary),
+      backgroundColor: scheme.surface,
+      child: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppTheme.heroGreenBg,
+                    backgroundImage:
+                        hasAvatar ? NetworkImage(_userAvatar!) : null,
+                    child: hasAvatar
+                        ? null
+                        : Icon(Icons.person, color: scheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_userName,
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: scheme.onSurface),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        Text(_userEmail,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          tile(Icons.home_outlined, 'Ana Sayfa', () => go(0)),
-          tile(Icons.checklist_outlined, 'Listelerim', () => go(1)),
-          tile(Icons.auto_awesome_outlined, 'AI Asistanı', () => go(2)),
-          tile(Icons.person_outline, 'Profil', () => go(3)),
-          tile(Icons.bar_chart_outlined, 'İstatistikler', _openStats),
-          const Divider(),
-          tile(Icons.group_outlined, 'Arkadaşlar',
-              () => push(const FriendsScreen())),
-          tile(Icons.notifications_outlined, 'Bildirimler',
-              () => push(const NotificationsScreen())),
-          tile(
-              Icons.settings_outlined,
-              'Ayarlar',
-              () => push(SettingsPage(
-                    toggleTheme: widget.toggleTheme,
-                    changeLocale: widget.changeLocale,
-                  ))),
-          const Divider(),
-          tile(Icons.logout, 'Çıkış Yap', _signOut, color: scheme.error),
-        ],
+            Divider(height: 1, color: scheme.outlineVariant),
+            const SizedBox(height: 6),
+            tile(Icons.home_outlined, 'Ana Sayfa', () => go(0),
+                selected: _pageIndex == 0),
+            tile(Icons.checklist_outlined, 'Listelerim', () => go(1),
+                selected: _pageIndex == 1),
+            tile(Icons.auto_awesome_outlined, 'AI Asistanı', () => go(2),
+                selected: _pageIndex == 2),
+            tile(Icons.person_outline, 'Profil', () => go(3),
+                selected: _pageIndex == 3),
+            tile(Icons.bar_chart_outlined, 'İstatistikler', _openStats),
+            Divider(height: 1, color: scheme.outlineVariant),
+            const SizedBox(height: 6),
+            tile(Icons.group_outlined, 'Arkadaşlar',
+                () => push(const FriendsScreen())),
+            tile(
+              Icons.notifications_outlined,
+              'Bildirimler',
+              _openNotifications,
+              trailing: _unread > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _unread > 99 ? '99+' : '$_unread',
+                        style: TextStyle(
+                            color: scheme.onPrimary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    )
+                  : null,
+            ),
+            tile(
+                Icons.settings_outlined,
+                'Ayarlar',
+                () => push(SettingsPage(
+                      toggleTheme: widget.toggleTheme,
+                      changeLocale: widget.changeLocale,
+                    ))),
+            Divider(height: 1, color: scheme.outlineVariant),
+            const SizedBox(height: 6),
+            tile(Icons.logout, 'Çıkış Yap', _signOut, color: scheme.error),
+          ],
+        ),
       ),
     );
   }

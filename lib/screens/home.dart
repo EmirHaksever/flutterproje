@@ -31,9 +31,11 @@ class _HomePageState extends State<HomePage> {
   int completedItems = 0;
   List<Map<String, dynamic>> _dynamicCategories = [];
   List<Map<String, dynamic>> _allAvailableCategories = [];
+  int _unread = 0;
 
   StreamSubscription<List<Map<String, dynamic>>>? _shoppingListSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _listItemSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _notifSubscription;
 
   @override
   void initState() {
@@ -71,12 +73,24 @@ class _HomePageState extends State<HomePage> {
         fetchUserInfo();
       }
     });
+
+    _notifSubscription = supabase
+        .from('notifications')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .listen((rows) {
+      if (mounted) {
+        setState(() =>
+            _unread = rows.where((r) => r['is_read'] != true).length);
+      }
+    });
   }
 
   @override
   void dispose() {
     _shoppingListSubscription?.cancel();
     _listItemSubscription?.cancel();
+    _notifSubscription?.cancel();
     super.dispose();
   }
 
@@ -425,7 +439,12 @@ class _HomePageState extends State<HomePage> {
             context,
             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
           ),
-          icon: const Icon(Icons.notifications_none_rounded),
+          icon: Badge(
+            isLabelVisible: _unread > 0,
+            label: Text(_unread > 99 ? '99+' : '$_unread'),
+            backgroundColor: scheme.error,
+            child: const Icon(Icons.notifications_none_rounded),
+          ),
         ),
       ],
     );
