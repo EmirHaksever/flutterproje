@@ -400,6 +400,35 @@ class EmptyState extends StatelessWidget {
   }
 }
 
+/// Veri çekilemediğinde gösterilen "tekrar dene" bloğu.
+/// [EmptyState] ile aynı düzen; sadece ikon/metin/aksiyon hazır gelir.
+class ErrorRetry extends StatelessWidget {
+  const ErrorRetry({
+    super.key,
+    this.title = 'Bir şeyler ters gitti',
+    this.message,
+    required this.onRetry,
+    this.compact = false,
+  });
+
+  final String title;
+  final String? message;
+  final VoidCallback onRetry;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return EmptyState(
+      icon: Icons.cloud_off_rounded,
+      title: title,
+      message: message ?? 'İnternet bağlantını kontrol edip tekrar dene.',
+      actionLabel: 'Tekrar dene',
+      onAction: onRetry,
+      compact: compact,
+    );
+  }
+}
+
 /// Ürün küçük görseli: `imageUrl` varsa fotoğraf, yoksa yeşil kutuda emoji.
 class ProductThumb extends StatelessWidget {
   const ProductThumb({

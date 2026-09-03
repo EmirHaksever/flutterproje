@@ -24,6 +24,7 @@ class _MyListsPageState extends State<MyListsPage> {
 
   List<ShoppingList> _lists = [];
   bool _isLoadingLists = true;
+  bool _loadError = false;
   String? _userId;
 
   List<Map<String, dynamic>> _allAvailableCategories = [];
@@ -76,16 +77,16 @@ class _MyListsPageState extends State<MyListsPage> {
         setState(() {
           _lists = lists;
           _isLoadingLists = false;
+          _loadError = false;
         });
       }
     } catch (e) {
       debugPrint('Listeler yüklenemedi: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Listeler yüklenirken bir hata oluştu.')),
-        );
-        setState(() => _isLoadingLists = false);
+        setState(() {
+          _isLoadingLists = false;
+          _loadError = true;
+        });
       }
     }
   }
@@ -254,7 +255,9 @@ class _MyListsPageState extends State<MyListsPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
         children: [
-          if (lists.isEmpty && !_isLoadingLists)
+          if (lists.isEmpty && !_isLoadingLists && _loadError)
+            ErrorRetry(onRetry: _fetchLists)
+          else if (lists.isEmpty && !_isLoadingLists)
             EmptyState(
               icon: emptyIcon,
               title: emptyTitle,

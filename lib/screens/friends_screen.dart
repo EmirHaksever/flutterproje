@@ -25,6 +25,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   List<FriendRequest> _outgoing = [];
 
   Timer? _debounce;
+  bool _loadError = false;
   bool _searching = false;
   List<({String id, String? name, String email, String? avatarUrl})> _results =
       [];
@@ -102,11 +103,14 @@ class _FriendsScreenState extends State<FriendsScreen> {
         _incoming = results[1] as List<FriendRequest>;
         _outgoing = results[2] as List<FriendRequest>;
         _loading = false;
+        _loadError = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      _snack('Arkadaş verileri yüklenemedi.', error: true);
+      setState(() {
+        _loading = false;
+        _loadError = true;
+      });
     }
   }
 
@@ -241,13 +245,15 @@ class _FriendsScreenState extends State<FriendsScreen> {
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
-                  : TabBarView(
-                      children: [
-                        _friendsTab(scheme),
-                        _requestsTab(scheme, _incoming, incoming: true),
-                        _requestsTab(scheme, _outgoing, incoming: false),
-                      ],
-                    ),
+                  : _loadError
+                      ? ErrorRetry(onRetry: _load)
+                      : TabBarView(
+                          children: [
+                            _friendsTab(scheme),
+                            _requestsTab(scheme, _incoming, incoming: true),
+                            _requestsTab(scheme, _outgoing, incoming: false),
+                          ],
+                        ),
             ),
           ],
         ),

@@ -23,6 +23,7 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
   final supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _items = [];
   bool _isLoading = true;
+  bool _loadError = false;
 
   @override
   void initState() {
@@ -41,11 +42,17 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
         setState(() {
           _items = List<Map<String, dynamic>>.from(response as List);
           _isLoading = false;
+          _loadError = false;
         });
       }
     } catch (e) {
       debugPrint('Kategori detayları çekilemedi: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadError = true;
+        });
+      }
     }
   }
 
@@ -119,6 +126,8 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
       appBar: AppBar(title: Text('$emoji  ${widget.categoryName}')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _loadError
+          ? ErrorRetry(onRetry: _fetch)
           : _items.isEmpty
           ? EmptyState(
               icon: Icons.history_rounded,

@@ -16,6 +16,7 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final NotificationsRepository _repo = NotificationsRepository();
   bool _loading = true;
+  bool _loadError = false;
   List<AppNotification> _items = [];
 
   @override
@@ -32,18 +33,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() {
         _items = list;
         _loading = false;
+        _loadError = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      _snack('Bildirimler yüklenemedi.');
+      setState(() {
+        _loading = false;
+        _loadError = true;
+      });
     }
-  }
-
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _markAllRead() async {
@@ -129,7 +127,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
+          : _loadError
+              ? ErrorRetry(onRetry: _load)
+              : _items.isEmpty
               ? _empty(scheme)
               : RefreshIndicator(
                   onRefresh: _load,
