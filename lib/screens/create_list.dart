@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repositories/image_repository.dart';
+import '../repositories/list_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui_kit.dart';
 
@@ -34,8 +35,10 @@ class _CreateListPageState extends State<CreateListPage> {
   final supabase = Supabase.instance.client;
   final ImagePicker _picker = ImagePicker();
   final ImageRepository _imageRepo = ImageRepository();
+  final ListRepository _listRepo = ListRepository();
 
   final List<Map<String, dynamic>> products = [];
+  List<({String name, String? category})> _pastProducts = [];
   bool _saving = false;
 
   static const Map<String, List<String>> _templates = {
@@ -64,6 +67,16 @@ class _CreateListPageState extends State<CreateListPage> {
       // initState içinde setState yasak → ilk kare çizildikten sonra uygula.
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _applyTemplate(tpl));
+    }
+    _loadPastProducts();
+  }
+
+  Future<void> _loadPastProducts() async {
+    try {
+      final v = await _listRepo.fetchRecentProductNames();
+      if (mounted) setState(() => _pastProducts = v);
+    } catch (_) {
+      // öneri yoksa sorun değil, sessiz geç
     }
   }
 
@@ -201,12 +214,29 @@ class _CreateListPageState extends State<CreateListPage> {
                           controller: nameCtrl,
                           autofocus: true,
                           textCapitalization: TextCapitalization.sentences,
+                          onChanged: (_) => setSheet(() {}),
                           decoration: const InputDecoration(
                             hintText: 'Ürün adı (örn: Süt 1 L)',
                           ),
                         ),
                       ),
                     ],
+                  ),
+                  ProductSuggestions(
+                    query: nameCtrl.text,
+                    pool: _pastProducts,
+                    exclude: products
+                        .map((p) =>
+                            (p['product_name'] as String).toLowerCase())
+                        .toSet(),
+                    onPick: (m) => setSheet(() {
+                      nameCtrl.text = m.name;
+                      nameCtrl.selection = TextSelection.collapsed(
+                          offset: m.name.length);
+                      if (category == null && m.category != null) {
+                        category = m.category;
+                      }
+                    }),
                   ),
                   if (widget.availableCategories.isNotEmpty) ...[
                     const SizedBox(height: 14),

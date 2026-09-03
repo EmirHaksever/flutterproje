@@ -141,6 +141,26 @@ void main() {
     expect(find.text('Bekleyen'), findsOneWidget);
   });
 
+  testWidgets('ProductSuggestions sorguya göre filtreler + seçilince döner',
+      (tester) async {
+    ({String name, String? category})? picked;
+    await tester.pumpWidget(_Host(
+      child: ProductSuggestions(
+        query: 'sü',
+        pool: const [
+          (name: 'Süt', category: 'Süt Ürünleri'),
+          (name: 'Ekmek', category: null),
+        ],
+        exclude: const {},
+        onPick: (m) => picked = m,
+      ),
+    ));
+    expect(find.text('Süt'), findsOneWidget);
+    expect(find.text('Ekmek'), findsNothing);
+    await tester.tap(find.text('Süt'));
+    expect(picked?.name, 'Süt');
+  });
+
   testWidgets('EmptyState başlık + mesaj + buton', (tester) async {
     var tapped = false;
     await tester.pumpWidget(_Host(

@@ -400,6 +400,67 @@ class EmptyState extends StatelessWidget {
   }
 }
 
+/// Ürün adı yazarken geçmiş alışverişlerden öneri çipleri.
+/// [query] boşsa "sık kullandıkların", doluysa eşleşenler gösterilir.
+class ProductSuggestions extends StatelessWidget {
+  const ProductSuggestions({
+    super.key,
+    required this.query,
+    required this.pool,
+    required this.exclude,
+    required this.onPick,
+  });
+
+  final String query;
+  final List<({String name, String? category})> pool;
+
+  /// Zaten eklenmiş ürün adları (küçük harf) — önerilerden çıkarılır.
+  final Set<String> exclude;
+  final void Function(({String name, String? category}) pick) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final q = query.trim().toLowerCase();
+    final matches = pool
+        .where((p) => !exclude.contains(p.name.toLowerCase()))
+        .where((p) => q.isEmpty || p.name.toLowerCase().contains(q))
+        .take(8)
+        .toList();
+    if (matches.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            q.isEmpty ? 'Sık kullandıkların' : 'Geçmişten',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final m in matches)
+                ActionChip(
+                  label: Text(m.name),
+                  labelStyle: const TextStyle(fontSize: 12),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => onPick(m),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Veri çekilemediğinde gösterilen "tekrar dene" bloğu.
 /// [EmptyState] ile aynı düzen; sadece ikon/metin/aksiyon hazır gelir.
 class ErrorRetry extends StatelessWidget {

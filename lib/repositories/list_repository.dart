@@ -97,6 +97,31 @@ class ListRepository {
         .toList();
   }
 
+  /// Kullanıcının geçmişte eklediği ürünlerden benzersiz adlar (adı yazarken
+  /// öneri için), en yeni önce. Ad küçük harfe göre tekilleştirilir.
+  Future<List<({String name, String? category})>> fetchRecentProductNames({
+    int limit = 300,
+  }) async {
+    final rows = await _client
+        .from('list_items')
+        .select('product_name, category, created_at')
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    final seen = <String>{};
+    final out = <({String name, String? category})>[];
+    for (final r in rows) {
+      final name = (r['product_name'] as String?)?.trim() ?? '';
+      if (name.isEmpty) continue;
+      final key = name.toLowerCase();
+      if (seen.contains(key)) continue;
+      seen.add(key);
+      final cat = (r['category'] as String?)?.trim();
+      out.add((name: name, category: (cat == null || cat.isEmpty) ? null : cat));
+    }
+    return out;
+  }
+
   // --- list_items ----------------------------------------------------------
 
   Future<List<ListItem>> fetchItems(String listId) async {

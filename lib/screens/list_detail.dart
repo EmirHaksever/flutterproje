@@ -30,6 +30,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
   String listOwnerEmail = '';
   List<Map<String, dynamic>> _items = [];
   List<String> _sharedEmails = [];
+  List<({String name, String? category})> _pastProducts = [];
   bool _hideCompleted = false;
   RealtimeChannel? _itemsChannel;
   RealtimeChannel? _listCompletionChannel;
@@ -97,8 +98,18 @@ class _ListDetailPageState extends State<ListDetailPage> {
     await _fetchListOwnerEmail(widget.listData['user_id'] as String);
     await _fetchItems();
     await _fetchSharedUsers();
+    _loadPastProducts();
     _subscribeToRealtimeItems();
     _setupCompletionRateRealtimeListener();
+  }
+
+  Future<void> _loadPastProducts() async {
+    try {
+      final v = await _listRepo.fetchRecentProductNames();
+      if (mounted) setState(() => _pastProducts = v);
+    } catch (_) {
+      // öneri yoksa sorun değil
+    }
   }
 
   Future<bool> _checkUserHasAccess(String listId, String userId) async {
@@ -421,12 +432,31 @@ class _ListDetailPageState extends State<ListDetailPage> {
                           controller: nameCtrl,
                           autofocus: !editing,
                           textCapitalization: TextCapitalization.sentences,
+                          onChanged: (_) => setSheet(() {}),
                           decoration: const InputDecoration(
                               hintText: 'Ürün adı (örn: Süt 1 L)'),
                         ),
                       ),
                     ],
                   ),
+                  if (!editing)
+                    ProductSuggestions(
+                      query: nameCtrl.text,
+                      pool: _pastProducts,
+                      exclude: _items
+                          .map((i) =>
+                              (i['product_name'] as String? ?? '')
+                                  .toLowerCase())
+                          .toSet(),
+                      onPick: (m) => setSheet(() {
+                        nameCtrl.text = m.name;
+                        nameCtrl.selection = TextSelection.collapsed(
+                            offset: m.name.length);
+                        if (category == null && m.category != null) {
+                          category = m.category;
+                        }
+                      }),
+                    ),
                   if (newBytes != null || currentImageUrl != null)
                     Align(
                       alignment: Alignment.centerLeft,
