@@ -69,8 +69,9 @@ class _CreateListPageState extends State<CreateListPage> {
       if (_listNameController.text.trim().isEmpty) {
         _listNameController.text = key;
       }
-      final existing =
-          products.map((p) => (p['product_name'] as String).toLowerCase()).toSet();
+      final existing = products
+          .map((p) => (p['product_name'] as String).toLowerCase())
+          .toSet();
       for (final name in _templates[key]!) {
         if (existing.contains(name.toLowerCase())) continue;
         products.add(_newProduct(name, _pendingCategory));
@@ -143,138 +144,140 @@ class _CreateListPageState extends State<CreateListPage> {
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
           child: StatefulBuilder(
-            builder: (ctx, setSheet) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Ürün Ekle',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: scheme.onSurface)),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        final picked = await _pickImage();
-                        if (picked != null) {
-                          setSheet(() {
-                            photoBytes = picked.$1;
-                            photoExt = picked.$2;
-                          });
-                        }
-                      },
-                      child: photoBytes == null
-                          ? Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: AppTheme.heroGreenBg,
+            builder: (ctx, setSheet) => SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Ürün Ekle',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: scheme.onSurface)),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () async {
+                          final picked = await _pickImage();
+                          if (picked != null) {
+                            setSheet(() {
+                              photoBytes = picked.$1;
+                              photoExt = picked.$2;
+                            });
+                          }
+                        },
+                        child: photoBytes == null
+                            ? Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.heroGreenBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(Icons.add_a_photo_outlined,
+                                    color: scheme.primary),
+                              )
+                            : ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
+                                child: Image.memory(photoBytes!,
+                                    width: 56, height: 56, fit: BoxFit.cover),
                               ),
-                              child: Icon(Icons.add_a_photo_outlined,
-                                  color: scheme.primary),
-                            )
-                          : ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.memory(photoBytes!,
-                                  width: 56, height: 56, fit: BoxFit.cover),
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: nameCtrl,
-                        autofocus: true,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          hintText: 'Ürün adı (örn: Süt 1 L)',
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: nameCtrl,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            hintText: 'Ürün adı (örn: Süt 1 L)',
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                if (widget.availableCategories.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Text('Kategori',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onSurfaceVariant)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: widget.availableCategories.map((c) {
-                      final name = c['name'].toString();
-                      final sel = category == name;
-                      return ChoiceChip(
-                        label: Text(name),
-                        selected: sel,
-                        onSelected: (_) =>
-                            setSheet(() => category = sel ? null : name),
-                      );
-                    }).toList(),
+                    ],
                   ),
-                ],
-                const SizedBox(height: 12),
-                TextField(
-                  controller: marketCtrl,
-                  decoration:
-                      const InputDecoration(hintText: 'Mağaza (opsiyonel)'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: tagsCtrl,
-                  decoration: const InputDecoration(
-                    hintText: 'Etiketler — virgülle ayır (opsiyonel)',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text('Adet',
+                  if (widget.availableCategories.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text('Kategori',
                         style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurface)),
-                    const Spacer(),
-                    _QtyStepper(
-                      value: qty,
-                      onChanged: (v) => setSheet(() => qty = v),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: widget.availableCategories.map((c) {
+                        final name = c['name'].toString();
+                        final sel = category == name;
+                        return ChoiceChip(
+                          label: Text(name),
+                          selected: sel,
+                          onSelected: (_) =>
+                              setSheet(() => category = sel ? null : name),
+                        );
+                      }).toList(),
                     ),
                   ],
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: FilledButton(
-                    onPressed: () {
-                      final name = nameCtrl.text.trim();
-                      if (name.isEmpty) return;
-                      setState(() {
-                        final p = _newProduct(name, category);
-                        p['quantity'] = qty;
-                        p['market'] = marketCtrl.text.trim().isEmpty
-                            ? null
-                            : marketCtrl.text.trim();
-                        p['tags'] = tagsCtrl.text
-                            .split(',')
-                            .map((e) => e.trim())
-                            .where((e) => e.isNotEmpty)
-                            .toList();
-                        p['image_bytes'] = photoBytes;
-                        p['image_ext'] = photoExt;
-                        products.add(p);
-                      });
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('Ekle'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: marketCtrl,
+                    decoration:
+                        const InputDecoration(hintText: 'Mağaza (opsiyonel)'),
                   ),
-                ),
-                const SizedBox(height: 8),
-              ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Etiketler — virgülle ayır (opsiyonel)',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('Adet',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurface)),
+                      const Spacer(),
+                      _QtyStepper(
+                        value: qty,
+                        onChanged: (v) => setSheet(() => qty = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      onPressed: () {
+                        final name = nameCtrl.text.trim();
+                        if (name.isEmpty) return;
+                        setState(() {
+                          final p = _newProduct(name, category);
+                          p['quantity'] = qty;
+                          p['market'] = marketCtrl.text.trim().isEmpty
+                              ? null
+                              : marketCtrl.text.trim();
+                          p['tags'] = tagsCtrl.text
+                              .split(',')
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList();
+                          p['image_bytes'] = photoBytes;
+                          p['image_ext'] = photoExt;
+                          products.add(p);
+                        });
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Ekle'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
             ),
           ),
         );
@@ -346,8 +349,7 @@ class _CreateListPageState extends State<CreateListPage> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -414,8 +416,8 @@ class _CreateListPageState extends State<CreateListPage> {
             children: [
               _label(scheme, 'Ürünler'),
               Text('${products.length} ürün',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant)),
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
             ],
           ),
           const SizedBox(height: 10),
@@ -460,9 +462,7 @@ class _CreateListPageState extends State<CreateListPage> {
   Widget _label(ColorScheme scheme, String text) => Text(
         text,
         style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurface),
+            fontSize: 14, fontWeight: FontWeight.w700, color: scheme.onSurface),
       );
 
   Widget _productRow(ColorScheme scheme, int i) {
@@ -482,7 +482,8 @@ class _CreateListPageState extends State<CreateListPage> {
           if (bytes != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.memory(bytes, width: 38, height: 38, fit: BoxFit.cover),
+              child:
+                  Image.memory(bytes, width: 38, height: 38, fit: BoxFit.cover),
             )
           else
             ProductThumb(
@@ -511,8 +512,7 @@ class _CreateListPageState extends State<CreateListPage> {
           ),
           _QtyStepper(
             value: p['quantity'] as int? ?? 1,
-            onChanged: (v) =>
-                _changeQty(i, v - (p['quantity'] as int? ?? 1)),
+            onChanged: (v) => _changeQty(i, v - (p['quantity'] as int? ?? 1)),
             dense: true,
           ),
           IconButton(
