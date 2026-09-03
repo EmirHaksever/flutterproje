@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/settings_controller.dart';
+import '../services/push_service.dart';
 
 class SettingsPage extends StatefulWidget {
   final void Function()? toggleTheme;
@@ -35,9 +36,6 @@ class _SettingsPageState extends State<SettingsPage> {
         ThemeMode.system => 'Sistem',
       };
 
-  String get _langLabel =>
-      _settings.locale.languageCode == 'en' ? 'English' : 'Türkçe';
-
   void _snack(String msg, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -67,33 +65,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   : null,
               onTap: () {
                 _settings.setThemeMode(e.key);
-                setState(() {});
-                Navigator.pop(ctx);
-              },
-            ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _pickLanguage() async {
-    final scheme = Theme.of(context).colorScheme;
-    await showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final e in const {'tr': 'Türkçe', 'en': 'English'}.entries)
-            ListTile(
-              title: Text(e.value),
-              trailing: _settings.locale.languageCode == e.key
-                  ? Icon(Icons.check, color: scheme.primary)
-                  : null,
-              onTap: () {
-                _settings.setLocale(Locale(e.key));
-                widget.changeLocale?.call(Locale(e.key));
                 setState(() {});
                 Navigator.pop(ctx);
               },
@@ -188,8 +159,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _setNotif(bool v) async {
     setState(() => _notifEnabled = v);
-    final p = await SharedPreferences.getInstance();
-    await p.setBool('notificationsEnabled', v);
+    await PushService.instance.setEnabled(v);
+    _snack(v ? 'Bildirimler açıldı.' : 'Bu cihazda bildirimler kapatıldı.');
   }
 
   @override
@@ -205,8 +176,6 @@ class _SettingsPageState extends State<SettingsPage> {
             _sectionTitle('Görünüm'),
             _tile(Icons.brightness_6_outlined, 'Tema',
                 value: _themeLabel, onTap: _pickTheme),
-            _tile(Icons.language_outlined, 'Dil',
-                value: _langLabel, onTap: _pickLanguage),
             const SizedBox(height: 20),
             _sectionTitle('Hesap'),
             _tile(Icons.lock_outline, 'Şifre Değiştir',

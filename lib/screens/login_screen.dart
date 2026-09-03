@@ -250,33 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           : Text(_isLogin ? 'Giriş Yap' : 'Kayıt Ol'),
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('veya',
-                            style:
-                                TextStyle(color: scheme.onSurfaceVariant)),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        _snack('Google ile giriş yakında eklenecek.'),
-                    icon: const Icon(Icons.g_mobiledata, size: 28),
-                    label: const Text('Google ile devam et'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 22),
                   GestureDetector(
                     onTap: () {
                       setState(() => _isLogin = !_isLogin);

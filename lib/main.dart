@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart'
@@ -76,13 +79,15 @@ class MyApp extends StatelessWidget {
           themeMode: settings.themeMode,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
-          locale: settings.locale,
-          supportedLocales: const [Locale('tr'), Locale('en')],
+          locale: const Locale('tr'),
+          supportedLocales: const [Locale('tr')],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
+          builder: (context, child) =>
+              _OfflineBanner(child: child ?? const SizedBox.shrink()),
           home: StreamBuilder<AuthState>(
             stream: Supabase.instance.client.auth.onAuthStateChange,
             builder: (context, snapshot) {
@@ -138,6 +143,72 @@ class MyApp extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// İnternet yokken uygulamanın altında ince bir şerit gösterir.
+class _OfflineBanner extends StatefulWidget {
+  const _OfflineBanner({required this.child});
+  final Widget child;
+
+  @override
+  State<_OfflineBanner> createState() => _OfflineBannerState();
+}
+
+class _OfflineBannerState extends State<_OfflineBanner> {
+  bool _offline = false;
+  StreamSubscription<List<ConnectivityResult>>? _sub;
+
+  bool _isOffline(List<ConnectivityResult> r) =>
+      r.isEmpty || r.every((e) => e == ConnectivityResult.none);
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = Connectivity().onConnectivityChanged.listen((r) {
+      final off = _isOffline(r);
+      if (mounted && off != _offline) setState(() => _offline = off);
+    });
+    Connectivity().checkConnectivity().then((r) {
+      if (mounted) setState(() => _offline = _isOffline(r));
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(child: widget.child),
+        if (_offline)
+          Material(
+            color: const Color(0xFF374151),
+            child: SafeArea(
+              top: false,
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.wifi_off_rounded,
+                        color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text('İnternet bağlantısı yok',
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
