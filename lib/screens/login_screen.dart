@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -156,15 +155,14 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 32),
-                  Container(
-                    width: 120,
-                    height: 120,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppTheme.heroGreenBg,
-                      borderRadius: BorderRadius.circular(35),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
+                      width: 108,
+                      height: 108,
+                      fit: BoxFit.cover,
                     ),
-                    child: const CustomPaint(painter: _GroceryLogoPainter()),
                   ),
                   const SizedBox(height: 24),
                   RichText(
@@ -286,110 +284,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
-
-/// Giriş logosu — yeşil kese kâğıdı + üstünden taşan renkli ürünler.
-class _GroceryLogoPainter extends CustomPainter {
-  const _GroceryLogoPainter();
-
-  static const _bagTop = Color(0xFF22C55E);
-  static const _bagBottom = Color(0xFF15803D);
-  static const _flap = Color(0xFF15803D);
-  static const _tomato = Color(0xFFEF4444);
-  static const _orange = Color(0xFFF59E0B);
-  static const _carrot = Color(0xFFF97316);
-  static const _greenA = Color(0xFF34D26A);
-  static const _greenB = Color(0xFF4ADE80);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    final s = w / 92; // ölçek
-    final p = Paint()..isAntiAlias = true;
-
-    void dot(double x, double y, double r, Color c) {
-      p.color = c;
-      canvas.drawCircle(Offset(x, y), r, p);
-    }
-
-    // Zemin gölgesi
-    p.color = Colors.black.withValues(alpha: 0.06);
-    canvas.drawOval(
-      Rect.fromCenter(
-          center: Offset(cx, h - 4 * s), width: 52 * s, height: 8 * s),
-      p,
-    );
-
-    // Yeşillik (marul/brokoli)
-    dot(cx - 4 * s, 18 * s, 10 * s, _greenA);
-    dot(cx + 8 * s, 16 * s, 8 * s, _greenB);
-    dot(cx - 16 * s, 20 * s, 7 * s, _greenB);
-
-    // Domates
-    dot(cx - 12 * s, 24 * s, 8 * s, _tomato);
-    p.color = Colors.white.withValues(alpha: 0.5);
-    canvas.drawCircle(Offset(cx - 15 * s, 21 * s), 2.2 * s, p);
-    // Portakal
-    dot(cx + 14 * s, 22 * s, 8 * s, _orange);
-    p.color = Colors.white.withValues(alpha: 0.5);
-    canvas.drawCircle(Offset(cx + 11 * s, 19 * s), 2.2 * s, p);
-
-    // Havuç
-    canvas.save();
-    canvas.translate(cx + 22 * s, 16 * s);
-    canvas.rotate(0.5);
-    p.color = _carrot;
-    canvas.drawPath(
-      Path()
-        ..moveTo(-5 * s, -8 * s)
-        ..lineTo(5 * s, -8 * s)
-        ..lineTo(0, 12 * s)
-        ..close(),
-      p,
-    );
-    p.color = _greenA;
-    canvas.drawCircle(Offset(-2 * s, -9 * s), 2.6 * s, p);
-    canvas.drawCircle(Offset(3 * s, -9 * s), 2.6 * s, p);
-    canvas.restore();
-
-    // Kese kâğıdının katlanmış kenarı
-    p.color = _flap;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 33 * s, 30 * s, 66 * s, 12 * s),
-        Radius.circular(6 * s),
-      ),
-      p,
-    );
-
-    // Kese gövdesi
-    p.shader = const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [_bagTop, _bagBottom],
-    ).createShader(Rect.fromLTWH(cx - 30 * s, 36 * s, 60 * s, 50 * s));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 30 * s, 36 * s, 60 * s, 50 * s),
-        Radius.circular(12 * s),
-      ),
-      p,
-    );
-    p.shader = null;
-
-    // Orta katlama çizgisi
-    p.color = Colors.white.withValues(alpha: 0.16);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 1.5 * s, 40 * s, 3 * s, 42 * s),
-        Radius.circular(2 * s),
-      ),
-      p,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _GroceryLogoPainter oldDelegate) => false;
 }
