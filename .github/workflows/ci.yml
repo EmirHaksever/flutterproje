@@ -20,6 +20,11 @@ jobs:
           channel: stable
           cache: true
 
+      # .env git'e girmez ama pubspec'te asset olarak tanımlı; CI'de boş bir
+      # kopya oluştur ki "asset yok" uyarısı analyze'ı düşürmesin.
+      - name: .env (CI kopyası)
+        run: cp .env.example .env
+
       - name: Bağımlılıklar
         run: flutter pub get
 
