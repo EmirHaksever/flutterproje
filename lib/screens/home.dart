@@ -411,13 +411,15 @@ class _HomePageState extends State<HomePage> {
               ),
               _categoryRow(scheme),
               const SizedBox(height: 20),
-              SectionHeader(
-                title: 'Listeler',
-                actionLabel: 'Tümünü Gör',
-                onAction: _openAllLists,
-              ),
-              ..._listCards(),
-              const SizedBox(height: 4),
+              if (shoppingLists.isNotEmpty) ...[
+                SectionHeader(
+                  title: 'Listeler',
+                  actionLabel: 'Tümünü Gör',
+                  onAction: _openAllLists,
+                ),
+                ..._listCards(),
+                const SizedBox(height: 4),
+              ],
               _aiCard(scheme),
             ],
           ),

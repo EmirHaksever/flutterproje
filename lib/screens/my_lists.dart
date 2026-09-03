@@ -216,12 +216,20 @@ class _MyListsPageState extends State<MyListsPage> {
                   children: [
                     _listTab(
                       lists: owned,
-                      emptyText: 'Henüz kendi listen yok.',
+                      emptyIcon: Icons.playlist_add_rounded,
+                      emptyTitle: 'Henüz listen yok',
+                      emptyMessage:
+                          'İlk alışveriş listeni oluştur, ürünleri ekle, '
+                          'işaretleyerek takip et.',
                       showCreateButton: true,
                     ),
                     _listTab(
                       lists: shared,
-                      emptyText: 'Seninle paylaşılan liste yok.',
+                      emptyIcon: Icons.group_outlined,
+                      emptyTitle: 'Paylaşılan liste yok',
+                      emptyMessage:
+                          'Bir arkadaşın seninle liste paylaştığında '
+                          'burada görünür.',
                       showCreateButton: false,
                     ),
                   ],
@@ -236,27 +244,23 @@ class _MyListsPageState extends State<MyListsPage> {
 
   Widget _listTab({
     required List<ShoppingList> lists,
-    required String emptyText,
+    required IconData emptyIcon,
+    required String emptyTitle,
+    required String emptyMessage,
     required bool showCreateButton,
   }) {
-    final scheme = Theme.of(context).colorScheme;
     return RefreshIndicator(
       onRefresh: _fetchLists,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
         children: [
           if (lists.isEmpty && !_isLoadingLists)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Column(
-                children: [
-                  Icon(Icons.checklist_rounded,
-                      size: 54, color: scheme.onSurfaceVariant),
-                  const SizedBox(height: 12),
-                  Text(emptyText,
-                      style: TextStyle(color: scheme.onSurfaceVariant)),
-                ],
-              ),
+            EmptyState(
+              icon: emptyIcon,
+              title: emptyTitle,
+              message: emptyMessage,
+              actionLabel: showCreateButton ? 'İlk Listeni Oluştur' : null,
+              onAction: showCreateButton ? _openCreateList : null,
             ),
           ...lists.map(
             (l) => ListCard(
@@ -266,7 +270,7 @@ class _MyListsPageState extends State<MyListsPage> {
               onTap: () => _openList(l),
             ),
           ),
-          if (showCreateButton) ...[
+          if (showCreateButton && lists.isNotEmpty) ...[
             const SizedBox(height: 4),
             SizedBox(
               height: 52,

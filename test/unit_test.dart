@@ -140,6 +140,23 @@ void main() {
     expect(find.text('8'), findsOneWidget);
     expect(find.text('Bekleyen'), findsOneWidget);
   });
+
+  testWidgets('EmptyState başlık + mesaj + buton', (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(_Host(
+      child: EmptyState(
+        icon: Icons.inbox,
+        title: 'Bildirim yok',
+        message: 'Sonra tekrar bak.',
+        actionLabel: 'Yenile',
+        onAction: () => tapped = true,
+      ),
+    ));
+    expect(find.text('Bildirim yok'), findsOneWidget);
+    expect(find.text('Sonra tekrar bak.'), findsOneWidget);
+    await tester.tap(find.text('Yenile'));
+    expect(tapped, true);
+  });
 }
 
 class _Host extends StatelessWidget {

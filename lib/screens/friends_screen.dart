@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/friend.dart';
 import '../repositories/friends_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ui_kit.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -343,8 +344,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Widget _friendsTab(ColorScheme scheme) {
     if (_friends.isEmpty) {
-      return _empty(scheme, Icons.group_outlined,
-          'Henüz arkadaşın yok.\nYukarıdan e-posta ile ekleyebilirsin.');
+      return const EmptyState(
+        icon: Icons.group_outlined,
+        title: 'Henüz arkadaşın yok',
+        message: 'Yukarıdaki arama kutusuna adını veya e-postasını yazarak '
+            'arkadaş ekle. Listelerini paylaşabilirsin.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _load,
@@ -379,10 +384,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
   Widget _requestsTab(
       ColorScheme scheme, List<FriendRequest> list, {required bool incoming}) {
     if (list.isEmpty) {
-      return _empty(
-        scheme,
-        Icons.inbox_outlined,
-        incoming ? 'Gelen istek yok.' : 'Gönderilmiş istek yok.',
+      return EmptyState(
+        icon: incoming ? Icons.inbox_outlined : Icons.send_outlined,
+        title: incoming ? 'Gelen istek yok' : 'Gönderilmiş istek yok',
+        message: incoming
+            ? 'Biri sana arkadaşlık isteği gönderdiğinde burada görünür.'
+            : 'Gönderdiğin istekler kabul edilene kadar burada bekler.',
       );
     }
     return RefreshIndicator(
@@ -461,21 +468,4 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
   }
 
-  Widget _empty(ColorScheme scheme, IconData icon, String text) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 54, color: scheme.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(text,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.onSurfaceVariant)),
-          ],
-        ),
-      ),
-    );
-  }
 }

@@ -119,6 +119,15 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
       appBar: AppBar(title: Text('$emoji  ${widget.categoryName}')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _items.isEmpty
+          ? EmptyState(
+              icon: Icons.history_rounded,
+              title: 'Bu kategoride geçmiş yok',
+              message: '$emoji ${widget.categoryName} kategorisinde bir şey '
+                  'aldıkça istatistikler ve en çok alınanlar burada dolar.',
+              actionLabel: 'Alışverişe Başla',
+              onAction: _startShopping,
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
               children: [

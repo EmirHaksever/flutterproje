@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/app_notification.dart';
 import '../repositories/notifications_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ui_kit.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -235,17 +236,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _empty(ColorScheme scheme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.notifications_none_rounded,
-              size: 60, color: scheme.onSurfaceVariant),
-          const SizedBox(height: 12),
-          Text('Henüz bildirim yok.',
-              style: TextStyle(color: scheme.onSurfaceVariant)),
-        ],
-      ),
+    return const EmptyState(
+      icon: Icons.notifications_none_rounded,
+      title: 'Bildirim yok',
+      message: 'Liste paylaşımı, arkadaşlık isteği ve güncellemeler '
+          'burada görünür.',
     );
   }
 }
