@@ -60,17 +60,19 @@ class FriendsRepository {
   }
 
   /// İsim veya e-posta ile kullanıcı arar (arkadaş eklemek için).
-  Future<List<({String id, String? name, String email})>> searchUsers(
-      String query) async {
+  Future<List<({String id, String? name, String email, String? avatarUrl})>>
+      searchUsers(String query) async {
     final q = query.trim();
     if (q.length < 2) return [];
     final rows = await _client.rpc('search_users', params: {'q': q}) as List;
     return rows
-        .map<({String id, String? name, String email})>((r) => (
-              id: r['id'] as String,
-              name: r['name'] as String?,
-              email: (r['email'] ?? '') as String,
-            ))
+        .map<({String id, String? name, String email, String? avatarUrl})>(
+            (r) => (
+                  id: r['id'] as String,
+                  name: r['name'] as String?,
+                  email: (r['email'] ?? '') as String,
+                  avatarUrl: r['avatar_url'] as String?,
+                ))
         .toList();
   }
 

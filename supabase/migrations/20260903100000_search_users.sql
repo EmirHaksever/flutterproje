@@ -7,12 +7,12 @@
 begin;
 
 create or replace function public.search_users(q text)
-returns table (id uuid, name text, email text)
+returns table (id uuid, name text, email text, avatar_url text)
 language sql
 security definer
 set search_path = public, pg_temp
 as $$
-  select u.id, u.name, u.email
+  select u.id, u.name, u.email, u.avatar_url
   from public.users u
   where length(trim(coalesce(q, ''))) >= 2
     and u.id <> auth.uid()

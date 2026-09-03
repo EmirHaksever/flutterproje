@@ -25,7 +25,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Timer? _debounce;
   bool _searching = false;
-  List<({String id, String? name, String email})> _results = [];
+  List<({String id, String? name, String email, String? avatarUrl})> _results =
+      [];
 
   @override
   void initState() {
@@ -279,11 +280,19 @@ class _FriendsScreenState extends State<FriendsScreen> {
             leading: CircleAvatar(
               radius: 16,
               backgroundColor: AppTheme.heroGreenBg,
-              child: Text(
-                name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?',
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, color: scheme.primary),
-              ),
+              backgroundImage:
+                  (r.avatarUrl != null && r.avatarUrl!.isNotEmpty)
+                      ? NetworkImage(r.avatarUrl!)
+                      : null,
+              child: (r.avatarUrl == null || r.avatarUrl!.isEmpty)
+                  ? Text(
+                      name.trim().isNotEmpty
+                          ? name.trim()[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: scheme.primary),
+                    )
+                  : null,
             ),
             title: Text(name,
                 style: const TextStyle(
