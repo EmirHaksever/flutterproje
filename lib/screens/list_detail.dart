@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -217,6 +217,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
     final newStatus = !(item['is_completed'] ?? false);
     final name = item['product_name'] ?? 'bir ürün';
 
+    HapticFeedback.selectionClick();
     setState(() => _items[index]['is_completed'] = newStatus);
     try {
       await supabase
@@ -250,6 +251,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
     final name = item['product_name'] ?? 'bir ürün';
     final original = Map<String, dynamic>.from(item);
 
+    HapticFeedback.mediumImpact();
     setState(() => _items.removeAt(index));
     try {
       await supabase.from('list_items').delete().eq('id', item['id']);
@@ -261,6 +263,50 @@ class _ListDetailPageState extends State<ListDetailPage> {
         setState(() => _items.insert(index, original));
         _snack('Ürün silinemedi.');
       }
+    }
+  }
+
+  /// Tamamlandı işaretli tüm ürünleri listeden siler (onay ister).
+  Future<void> _clearCompleted() async {
+    final done = _items.where((i) => i['is_completed'] == true).toList();
+    if (done.isEmpty) {
+      _snack('Tamamlanmış ürün yok.');
+      return;
+    }
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tamamlananları Temizle'),
+        content: Text(
+            '${done.length} tamamlanmış ürün listeden silinsin mi? '
+            'Bu işlem geri alınamaz.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Temizle'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final ids = done.map((i) => i['id']).toList();
+    HapticFeedback.mediumImpact();
+    setState(() => _items.removeWhere((i) => i['is_completed'] == true));
+    try {
+      await supabase.from('list_items').delete().inFilter('id', ids);
+      await _updateCompletionRate();
+      await _notifyParticipants(
+          '${done.length} tamamlanmış ürün temizlendi.');
+      if (mounted) _snack('${done.length} ürün temizlendi.');
+      await _fetchItems();
+    } catch (e) {
+      debugPrint('Tamamlananlar temizlenemedi: $e');
+      if (mounted) _snack('Temizlenirken bir hata oluştu.', error: true);
+      await _fetchItems();
     }
   }
 
@@ -653,8 +699,13 @@ class _ListDetailPageState extends State<ListDetailPage> {
               icon: const Icon(Icons.more_horiz),
               onSelected: (v) {
                 if (v == 'delete') _deleteList();
+                if (v == 'clearDone') _clearCompleted();
               },
               itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'clearDone',
+                  child: Text('Tamamlananları temizle'),
+                ),
                 const PopupMenuItem(
                   value: 'delete',
                   child: Text('Listeyi Sil'),
@@ -872,8 +923,21 @@ class _ListDetailPageState extends State<ListDetailPage> {
     if (!_isOwner) return tile;
     return Dismissible(
       key: ValueKey(item['id']),
-      direction: DismissDirection.endToStart,
+      // Sağa kaydır → tamamlandı işaretle/kaldır, sola kaydır → sil.
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 24, bottom: 8),
+        decoration: BoxDecoration(
+          color: scheme.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Icon(
+          completed ? Icons.remove_done_rounded : Icons.check_circle_rounded,
+          color: scheme.primary,
+        ),
+      ),
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24, bottom: 8),
         decoration: BoxDecoration(
@@ -883,33 +947,34 @@ class _ListDetailPageState extends State<ListDetailPage> {
         margin: const EdgeInsets.only(bottom: 8),
         child: Icon(Icons.delete_outline, color: scheme.error),
       ),
-      confirmDismiss: (_) async {
-        await _deleteItem(item);
-        return false; // listeyi _fetchItems tazeliyor
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          await _toggleItemComplete(item);
+        } else {
+          await _deleteItem(item);
+        }
+        return false; // listeyi _fetchItems / setState tazeliyor
       },
       child: tile,
     );
   }
 
   Widget _emptyItems(ColorScheme scheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.shopping_cart_outlined,
-                size: 46, color: scheme.onSurfaceVariant),
-            const SizedBox(height: 10),
-            Text(
-              _items.isEmpty
-                  ? 'Bu listede henüz ürün yok.'
-                  : 'Filtreye uyan ürün yok.',
-              style: TextStyle(color: scheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
+    if (_items.isEmpty) {
+      return EmptyState(
+        icon: Icons.shopping_cart_outlined,
+        title: 'Liste boş',
+        message: _isOwner
+            ? 'Sağ alttaki "Ürün Ekle" ile ilk ürünü ekle.'
+            : 'Liste sahibi ürün ekleyince burada görünür.',
+      );
+    }
+    return const EmptyState(
+      icon: Icons.filter_alt_off_rounded,
+      title: 'Filtreye uyan ürün yok',
+      message: 'Kategori filtresini ya da "tamamlananları gizle" '
+          'seçeneğini değiştir.',
+      compact: true,
     );
   }
 }
