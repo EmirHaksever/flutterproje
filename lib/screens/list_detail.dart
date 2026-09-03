@@ -320,6 +320,10 @@ class _ListDetailPageState extends State<ListDetailPage> {
         text: editing ? (existing['product_name'] ?? '') as String : '');
     final marketCtrl = TextEditingController(
         text: editing ? (existing['market'] ?? '') as String : '');
+    final tagsCtrl = TextEditingController(
+        text: editing && existing['tags'] is List
+            ? (existing['tags'] as List).join(', ')
+            : '');
     String? category = editing ? existing['category'] as String? : null;
     int qty = editing ? (existing['quantity'] as int? ?? 1) : 1;
     String? currentImageUrl =
@@ -416,6 +420,13 @@ class _ListDetailPageState extends State<ListDetailPage> {
                         const InputDecoration(hintText: 'Mağaza (opsiyonel)'),
                   ),
                   const SizedBox(height: 14),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Etiketler — virgülle ayır (ör: organik, büyük)',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       Text('Adet',
@@ -453,6 +464,11 @@ class _ListDetailPageState extends State<ListDetailPage> {
 
     final name = nameCtrl.text.trim();
     final market = marketCtrl.text.trim();
+    final tags = tagsCtrl.text
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     // Fotoğraf yükleme
     String? imageUrl = currentImageUrl;
@@ -474,6 +490,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
           category: category ?? '',
           market: market,
           imageUrl: imageUrl ?? '',
+          tags: tags,
         );
         await _notifyParticipants('"$name" güncellendi.');
       } else {
@@ -484,6 +501,7 @@ class _ListDetailPageState extends State<ListDetailPage> {
           'market': market.isEmpty ? null : market,
           'category': category,
           'image_url': imageUrl,
+          'tags': tags,
           'is_completed': false,
         });
         await _updateCompletionRate();
@@ -805,9 +823,11 @@ class _ListDetailPageState extends State<ListDetailPage> {
     final qty = item['quantity'] ?? 1;
     final market = item['market'] as String?;
     final category = item['category'] as String?;
+    final tags = (item['tags'] as List?)?.cast<String>() ?? const [];
     final meta = [
       if (qty != 1) 'x$qty',
       if (market != null && market.isNotEmpty) market,
+      if (tags.isNotEmpty) tags.join(', '),
     ].join(' • ');
 
     final tile = Container(

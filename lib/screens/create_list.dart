@@ -83,7 +83,7 @@ class _CreateListPageState extends State<CreateListPage> {
         'category': category,
         'market': null,
         'quantity': 1,
-        'features': <String>[],
+        'tags': <String>[],
         'is_completed': false,
         'image_bytes': null,
         'image_ext': 'jpg',
@@ -123,6 +123,8 @@ class _CreateListPageState extends State<CreateListPage> {
 
   Future<void> _addProductSheet() async {
     final nameCtrl = TextEditingController();
+    final marketCtrl = TextEditingController();
+    final tagsCtrl = TextEditingController();
     String? category = _pendingCategory;
     int qty = 1;
     Uint8List? photoBytes;
@@ -216,6 +218,19 @@ class _CreateListPageState extends State<CreateListPage> {
                     }).toList(),
                   ),
                 ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: marketCtrl,
+                  decoration:
+                      const InputDecoration(hintText: 'Mağaza (opsiyonel)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: tagsCtrl,
+                  decoration: const InputDecoration(
+                    hintText: 'Etiketler — virgülle ayır (opsiyonel)',
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -241,6 +256,14 @@ class _CreateListPageState extends State<CreateListPage> {
                       setState(() {
                         final p = _newProduct(name, category);
                         p['quantity'] = qty;
+                        p['market'] = marketCtrl.text.trim().isEmpty
+                            ? null
+                            : marketCtrl.text.trim();
+                        p['tags'] = tagsCtrl.text
+                            .split(',')
+                            .map((e) => e.trim())
+                            .where((e) => e.isNotEmpty)
+                            .toList();
                         p['image_bytes'] = photoBytes;
                         p['image_ext'] = photoExt;
                         products.add(p);
@@ -301,7 +324,7 @@ class _CreateListPageState extends State<CreateListPage> {
                 'category': p['category'],
                 'market': p['market'],
                 'quantity': p['quantity'],
-                'features': p['features'],
+                'tags': p['tags'],
                 'image_url': p['image_url'],
                 'is_completed': false,
                 'list_id': listId,

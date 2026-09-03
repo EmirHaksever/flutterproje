@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -21,6 +23,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
   List<FriendRequest> _incoming = [];
   List<FriendRequest> _outgoing = [];
 
+  Timer? _debounce;
+  bool _searching = false;
+  List<({String id, String? name, String email})> _results = [];
+
   @override
   void initState() {
     super.initState();
@@ -29,8 +35,55 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _addCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    final q = value.trim();
+    if (q.length < 2) {
+      setState(() {
+        _results = [];
+        _searching = false;
+      });
+      return;
+    }
+    setState(() => _searching = true);
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final res = await _repo.searchUsers(q);
+        if (mounted) {
+          setState(() {
+            _results = res;
+            _searching = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _searching = false);
+      }
+    });
+  }
+
+  Future<void> _sendTo(String email) async {
+    try {
+      await _repo.sendRequest(email);
+      if (!mounted) return;
+      _addCtrl.clear();
+      setState(() => _results = []);
+      FocusScope.of(context).unfocus();
+      _snack('Arkadaşlık isteği gönderildi.', ok: true);
+      _load();
+    } catch (e) {
+      _snack(_cleanError(e), error: true);
+    }
+  }
+
+  String _maskEmail(String e) {
+    final at = e.indexOf('@');
+    if (at <= 1) return e;
+    return '${e[0]}***${e.substring(at)}';
   }
 
   Future<void> _load() async {
@@ -68,22 +121,16 @@ class _FriendsScreenState extends State<FriendsScreen> {
     ));
   }
 
+  /// "+" butonu: tam e-posta yazıldıysa doğrudan gönder (isimle bulunamayanlar
+  /// için yedek yol).
   Future<void> _sendRequest() async {
-    final email = _addCtrl.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      _snack('Geçerli bir e-posta gir.', error: true);
+    final text = _addCtrl.text.trim();
+    if (!text.contains('@')) {
+      _snack('İsimle aramak için yazmaya devam et ya da tam e-posta gir.',
+          error: true);
       return;
     }
-    try {
-      await _repo.sendRequest(email);
-      if (!mounted) return;
-      _addCtrl.clear();
-      FocusScope.of(context).unfocus();
-      _snack('Arkadaşlık isteği gönderildi.', ok: true);
-      _load();
-    } catch (e) {
-      _snack(_cleanError(e), error: true);
-    }
+    await _sendTo(text);
   }
 
   Future<void> _respond(FriendRequest r, bool accept) async {
@@ -152,19 +199,25 @@ class _FriendsScreenState extends State<FriendsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
               child: TextField(
                 controller: _addCtrl,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.send,
+                textInputAction: TextInputAction.search,
+                onChanged: _onSearchChanged,
                 onSubmitted: (_) => _sendRequest(),
                 decoration: InputDecoration(
-                  hintText: 'E-posta ile arkadaş ekle',
+                  hintText: 'İsim veya e-posta ile arkadaş ara',
                   prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    icon: Icon(Icons.add, color: scheme.primary),
-                    onPressed: _sendRequest,
-                  ),
+                  suffixIcon: _addCtrl.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            _addCtrl.clear();
+                            setState(() => _results = []);
+                          },
+                        ),
                 ),
               ),
             ),
+            if (_addCtrl.text.trim().length >= 2) _searchResults(scheme),
             TabBar(
               labelColor: scheme.primary,
               unselectedLabelColor: scheme.onSurfaceVariant,
@@ -189,6 +242,61 @@ class _FriendsScreenState extends State<FriendsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _searchResults(ColorScheme scheme) {
+    if (_searching) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 6),
+        child: LinearProgressIndicator(minHeight: 2),
+      );
+    }
+    if (_results.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+        child: Text('Eşleşen kullanıcı yok.',
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+      );
+    }
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 230),
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        itemCount: _results.length,
+        itemBuilder: (context, i) {
+          final r = _results[i];
+          final name = (r.name?.trim().isNotEmpty ?? false)
+              ? r.name!
+              : r.email;
+          return ListTile(
+            dense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+            leading: CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.heroGreenBg,
+              child: Text(
+                name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?',
+                style: TextStyle(
+                    fontWeight: FontWeight.w700, color: scheme.primary),
+              ),
+            ),
+            title: Text(name,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w600)),
+            subtitle: Text(_maskEmail(r.email),
+                style: TextStyle(
+                    fontSize: 11, color: scheme.onSurfaceVariant)),
+            trailing: TextButton(
+              onPressed: () => _sendTo(r.email),
+              child: const Text('Ekle'),
+            ),
+          );
+        },
       ),
     );
   }

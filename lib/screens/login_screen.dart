@@ -13,6 +13,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
 
   bool _isLoading = false;
   bool _isLogin = true;
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -53,6 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final name = _nameController.text.trim();
+
+    if (!_isLogin && name.isEmpty) {
+      _snack('Adını gir (arkadaşların seni isimle bulabilsin).', error: true);
+      setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -70,9 +79,18 @@ class _LoginScreenState extends State<LoginScreen> {
         final signUpResponse = await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
+          data: {'name': name},
         );
         if (mounted) {
           if (signUpResponse.user != null) {
+            // Oturum varsa adı users tablosuna da yaz (trigger + yedek).
+            if (signUpResponse.session != null) {
+              try {
+                await Supabase.instance.client
+                    .from('users')
+                    .update({'name': name}).eq('id', signUpResponse.user!.id);
+              } catch (_) {}
+            }
             if (signUpResponse.session == null) {
               _snack('Kayıt başarılı! E-postanı kontrol edip hesabını onayla, '
                   'sonra giriş yapabilirsin.');
@@ -194,6 +212,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 35),
+                  if (!_isLogin) ...[
+                    TextField(
+                      controller: _nameController,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.person_outline),
+                        hintText: 'Ad Soyad',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,

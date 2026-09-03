@@ -59,6 +59,21 @@ class FriendsRepository {
     await _client.rpc('send_friend_request', params: {'target_email': email});
   }
 
+  /// İsim veya e-posta ile kullanıcı arar (arkadaş eklemek için).
+  Future<List<({String id, String? name, String email})>> searchUsers(
+      String query) async {
+    final q = query.trim();
+    if (q.length < 2) return [];
+    final rows = await _client.rpc('search_users', params: {'q': q}) as List;
+    return rows
+        .map<({String id, String? name, String email})>((r) => (
+              id: r['id'] as String,
+              name: r['name'] as String?,
+              email: (r['email'] ?? '') as String,
+            ))
+        .toList();
+  }
+
   Future<void> respond(String requestId, {required bool accept}) async {
     await _client.rpc('respond_friend_request',
         params: {'request_id': requestId, 'accept': accept});
