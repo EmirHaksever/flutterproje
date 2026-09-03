@@ -5,6 +5,8 @@ import 'dart:async';
 import 'category_detail_page.dart';
 import 'notifications_screen.dart';
 import 'my_lists.dart';
+import 'create_list.dart';
+import 'friends_screen.dart';
 import '../constants/categories.dart';
 import '../widgets/ui_kit.dart';
 import '../theme/app_theme.dart';
@@ -268,6 +270,27 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Boş liste (ya da şablon adı verilirse o şablonla dolu) oluşturma ekranı.
+  void _createList({String? template}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateListPage(
+          availableCategories: _allAvailableCategories,
+          customPrimarySwatch: widget.customPrimarySwatch,
+          initialTemplate: template,
+        ),
+      ),
+    );
+  }
+
+  void _openFriends() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FriendsScreen()),
+    );
+  }
+
   void _showCategoryManagementSheet() {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
@@ -376,6 +399,8 @@ class _HomePageState extends State<HomePage> {
                 _activeListHero(scheme, _activeList!)
               else
                 _emptyHero(scheme),
+              const SizedBox(height: 16),
+              _quickActions(scheme),
               const SizedBox(height: 16),
               _statRow(scheme),
               const SizedBox(height: 24),
@@ -497,6 +522,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _emptyHero(ColorScheme scheme) {
+    const templates = ['Haftalık Market', 'Kahvaltılık', 'Temizlik', 'Bebek'];
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -506,26 +532,120 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFD4EFD9)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.playlist_add_rounded, color: scheme.primary, size: 34),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Henüz listen yok',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text('Alttaki + ile ilk listeni oluştur.',
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant)),
-              ],
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.playlist_add_rounded,
+                    color: scheme.primary, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Haydi başlayalım',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text('İlk alışveriş listeni birkaç saniyede oluştur.',
+                        style: TextStyle(
+                            fontSize: 12, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _createList(),
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text('İlk Listeni Oluştur'),
             ),
+          ),
+          const SizedBox(height: 12),
+          Text('Ya da hazır bir şablonla:',
+              style:
+                  TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in templates)
+                ActionChip(
+                  label: Text(t),
+                  labelStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600),
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFD4EFD9)),
+                  onPressed: () => _createList(template: t),
+                ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _quickActions(ColorScheme scheme) {
+    Widget tile(
+        IconData icon, String label, Color color, VoidCallback onTap) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 21),
+                ),
+                const SizedBox(height: 8),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        tile(Icons.add_shopping_cart_rounded, 'Yeni Liste', scheme.primary,
+            () => _createList()),
+        const SizedBox(width: 10),
+        tile(Icons.auto_awesome_rounded, 'AI Asistan',
+            const Color(0xFF8B5CF6), () => Navigator.pushNamed(context, '/aiChat')),
+        const SizedBox(width: 10),
+        tile(Icons.group_add_rounded, 'Arkadaş Ekle', const Color(0xFF3B82F6),
+            _openFriends),
+      ],
     );
   }
 

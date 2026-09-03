@@ -10,12 +10,17 @@ import '../widgets/ui_kit.dart';
 
 class CreateListPage extends StatefulWidget {
   final String? initialFilterCategory;
+
+  /// Ana sayfadaki şablon çiplerinden gelince, açılışta uygulanacak şablon adı
+  /// (`_templates` anahtarlarından biri). Null ise boş liste ekranı açılır.
+  final String? initialTemplate;
   final List<Map<String, dynamic>> availableCategories;
   final MaterialColor customPrimarySwatch;
 
   const CreateListPage({
     super.key,
     this.initialFilterCategory,
+    this.initialTemplate,
     required this.availableCategories,
     required this.customPrimarySwatch,
   });
@@ -53,6 +58,12 @@ class _CreateListPageState extends State<CreateListPage> {
         widget.initialFilterCategory!.isNotEmpty) {
       // Bir kategoriden gelindiyse ilk ürün o kategoride başlasın diye sakla.
       _pendingCategory = widget.initialFilterCategory;
+    }
+    final tpl = widget.initialTemplate;
+    if (tpl != null && _templates.containsKey(tpl)) {
+      // initState içinde setState yasak → ilk kare çizildikten sonra uygula.
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _applyTemplate(tpl));
     }
   }
 
