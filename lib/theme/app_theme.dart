@@ -14,10 +14,28 @@ class AppTheme {
   static const Color brandGreenDark = Color(0xFF15803D);
   static const Color heroGreenBg = Color(0xFFEAF8EE); // greenSoft
 
-  static const Color bgLight = Color(0xFFF8FAF8);
+  static const Color bgLight = Color(0xFFF1F4F2);
   static const Color textPrimary = Color(0xFF111827);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color borderLight = Color(0xFFE5E7EB);
+
+  /// Kartların zeminden "kalkmış" görünmesi için çok yumuşak gölge.
+  /// Karanlık temada gölge işe yaramaz (siyahın üstüne siyah) → boş liste döner.
+  static List<BoxShadow> softShadow(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const []
+          : const [
+              BoxShadow(
+                color: Color(0x0A111827),
+                blurRadius: 3,
+                offset: Offset(0, 1),
+              ),
+              BoxShadow(
+                color: Color(0x14111827),
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ];
 
   static const Color accentOrange = Color(0xFFF59E0B);
   static const Color accentBlue = Color(0xFF3B82F6);

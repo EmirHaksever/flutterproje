@@ -80,6 +80,7 @@ class MiniStatCard extends StatelessWidget {
           color: scheme.surface,
           borderRadius: BorderRadius.circular(15),
           border: Border.all(color: scheme.outlineVariant),
+          boxShadow: AppTheme.softShadow(Theme.of(context).brightness),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -188,6 +189,7 @@ class ListCard extends StatelessWidget {
         color: scheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: scheme.outlineVariant),
+        boxShadow: AppTheme.softShadow(Theme.of(context).brightness),
       ),
       child: InkWell(
         onTap: onTap,
@@ -270,6 +272,7 @@ class CategoryCard extends StatelessWidget {
           color: scheme.surface,
           borderRadius: BorderRadius.circular(17),
           border: Border.all(color: scheme.outlineVariant),
+          boxShadow: AppTheme.softShadow(Theme.of(context).brightness),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -610,6 +610,7 @@ class _HomePageState extends State<HomePage> {
               color: scheme.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: scheme.outlineVariant),
+              boxShadow: AppTheme.softShadow(Theme.of(context).brightness),
             ),
             child: Column(
               children: [
@@ -672,10 +673,10 @@ class _HomePageState extends State<HomePage> {
           style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13));
     }
     return SizedBox(
-      height: 90,
+      height: 102,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.only(bottom: 6),
         itemCount: _dynamicCategories.length,
         itemBuilder: (context, i) {
           final cat = _dynamicCategories[i];
@@ -737,6 +738,7 @@ class _HomePageState extends State<HomePage> {
           color: scheme.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: scheme.outlineVariant),
+          boxShadow: AppTheme.softShadow(Theme.of(context).brightness),
         ),
         child: Row(
           children: [
