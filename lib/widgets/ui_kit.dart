@@ -61,16 +61,23 @@ class MiniStatCard extends StatelessWidget {
     super.key,
     required this.value,
     required this.label,
+    this.icon,
+    this.iconColor,
     this.onTap,
   });
 
   final String value;
   final String label;
+
+  /// Verilirse sayının üstünde tonlu daire içinde bir ikon gösterilir.
+  final IconData? icon;
+  final Color? iconColor;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tint = iconColor ?? scheme.primary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(15),
@@ -85,6 +92,18 @@ class MiniStatCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (icon != null) ...[
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 18, color: tint),
+              ),
+              const SizedBox(height: 8),
+            ],
             Text(
               value,
               style: TextStyle(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../theme/app_theme.dart';
 import '../widgets/ui_kit.dart';
 import 'create_list.dart';
 
@@ -127,16 +128,31 @@ class _CategoryDetailPageState extends State<CategoryDetailPage> {
                 Row(
                   children: [
                     Expanded(
-                        child: MiniStatCard(
-                            value: '${_items.length}', label: 'Toplam')),
+                      child: MiniStatCard(
+                        value: '${_items.length}',
+                        label: 'Toplam',
+                        icon: Icons.inventory_2_rounded,
+                        iconColor: AppTheme.accentBlue,
+                      ),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
-                        child: MiniStatCard(
-                            value: '$_completed', label: 'Tamamlanan')),
+                      child: MiniStatCard(
+                        value: '$_completed',
+                        label: 'Tamamlanan',
+                        icon: Icons.check_circle_rounded,
+                        iconColor: AppTheme.brandGreen,
+                      ),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
-                        child: MiniStatCard(
-                            value: '$_thisMonth', label: 'Bu Ay')),
+                      child: MiniStatCard(
+                        value: '$_thisMonth',
+                        label: 'Bu Ay',
+                        icon: Icons.calendar_month_rounded,
+                        iconColor: AppTheme.accentOrange,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),

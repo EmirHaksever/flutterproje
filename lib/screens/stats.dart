@@ -191,15 +191,31 @@ class _StatsPageState extends State<StatsPage> {
     return Row(
       children: [
         Expanded(
-            child: MiniStatCard(
-                value: '%${(_completionRate * 100).round()}',
-                label: 'Tamamlama')),
+          child: MiniStatCard(
+            value: '%${(_completionRate * 100).round()}',
+            label: 'Tamamlama',
+            icon: Icons.percent_rounded,
+            iconColor: AppTheme.brandGreen,
+          ),
+        ),
         const SizedBox(width: 10),
         Expanded(
-            child: MiniStatCard(value: '$_totalLists', label: 'Liste')),
+          child: MiniStatCard(
+            value: '$_totalLists',
+            label: 'Liste',
+            icon: Icons.checklist_rounded,
+            iconColor: AppTheme.accentBlue,
+          ),
+        ),
         const SizedBox(width: 10),
         Expanded(
-            child: MiniStatCard(value: '$_totalItems', label: 'Ürün')),
+          child: MiniStatCard(
+            value: '$_totalItems',
+            label: 'Ürün',
+            icon: Icons.shopping_basket_rounded,
+            iconColor: AppTheme.accentOrange,
+          ),
+        ),
       ],
     );
   }

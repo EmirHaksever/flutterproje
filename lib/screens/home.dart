@@ -654,15 +654,32 @@ class _HomePageState extends State<HomePage> {
     final pending = (totalItems - completedItems).clamp(0, 1 << 30);
     return Row(
       children: [
-        Expanded(child: MiniStatCard(value: '$pending', label: 'Bekleyen')),
+        Expanded(
+          child: MiniStatCard(
+            value: '$pending',
+            label: 'Bekleyen',
+            icon: Icons.pending_actions_rounded,
+            iconColor: AppTheme.accentOrange,
+          ),
+        ),
         const SizedBox(width: 8),
         Expanded(
-            child: MiniStatCard(
-                value: '$completedItems', label: 'Tamamlanan')),
+          child: MiniStatCard(
+            value: '$completedItems',
+            label: 'Tamamlanan',
+            icon: Icons.check_circle_rounded,
+            iconColor: scheme.primary,
+          ),
+        ),
         const SizedBox(width: 8),
         Expanded(
-            child: MiniStatCard(
-                value: '${shoppingLists.length}', label: 'Listeler')),
+          child: MiniStatCard(
+            value: '${shoppingLists.length}',
+            label: 'Listeler',
+            icon: Icons.checklist_rounded,
+            iconColor: AppTheme.accentBlue,
+          ),
+        ),
       ],
     );
   }
