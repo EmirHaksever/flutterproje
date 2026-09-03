@@ -224,10 +224,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
               unselectedLabelColor: scheme.onSurfaceVariant,
               indicatorColor: scheme.primary,
               labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 6),
               tabs: [
-                Tab(text: 'Arkadaşlarım (${_friends.length})'),
-                Tab(text: 'Gelen (${_incoming.length})'),
-                Tab(text: 'Gönderilen (${_outgoing.length})'),
+                Tab(
+                  child: _tabLabel('Arkadaşlar', _friends.length, scheme),
+                ),
+                Tab(
+                  child: _tabLabel('Gelen', _incoming.length, scheme),
+                ),
+                Tab(
+                  child: _tabLabel('Gönderilen', _outgoing.length, scheme),
+                ),
               ],
             ),
             Expanded(
@@ -244,6 +251,30 @@ class _FriendsScreenState extends State<FriendsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _tabLabel(String text, int count, ColorScheme scheme) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(text),
+        if (count > 0) ...[
+          const SizedBox(width: 5),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text('$count',
+                style: TextStyle(
+                    color: scheme.onPrimary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ],
     );
   }
 
